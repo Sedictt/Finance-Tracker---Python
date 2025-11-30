@@ -40,6 +40,9 @@ class FinanceTrackerApp(ctk.CTk):
         self.sidebar_button_4 = ctk.CTkButton(self.sidebar_frame, text="Predictions", command=self.sidebar_button_event_predictions)
         self.sidebar_button_4.grid(row=4, column=0, padx=20, pady=10)
 
+        self.sidebar_button_exit = ctk.CTkButton(self.sidebar_frame, text="Exit", command=self.sidebar_button_event_exit, fg_color="#c42b1c", hover_color="#8a1f15")
+        self.sidebar_button_exit.grid(row=6, column=0, padx=20, pady=(10, 20))
+
         # Initialize Views
         self.dashboard_view = DashboardView(self)
         self.transaction_view = TransactionView(self)
@@ -88,6 +91,9 @@ class FinanceTrackerApp(ctk.CTk):
         
     def sidebar_button_event_predictions(self):
         self.select_frame_by_name("predictions")
+
+    def sidebar_button_event_exit(self):
+        self.quit()
 
 if __name__ == "__main__":
     app = FinanceTrackerApp()
