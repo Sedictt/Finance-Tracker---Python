@@ -1,4 +1,4 @@
-# Personal Finance Tracker
+ # Personal Finance Tracker
 
 A complete desktop application demonstrating all Python concepts in a practical, usable tool.
 
