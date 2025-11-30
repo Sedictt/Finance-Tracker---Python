@@ -52,6 +52,12 @@ class FinanceTrackerApp(ctk.CTk):
         # Select default frame
         self.select_frame_by_name("dashboard")
 
+        # Handle window closing
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
+        # Start maximized (Full Screen)
+        self.after(0, lambda: self.state('zoomed'))
+
     def select_frame_by_name(self, name):
         # set button color for selected button
         self.sidebar_button_1.configure(fg_color=("gray75", "gray25") if name == "dashboard" else "transparent")
@@ -93,6 +99,10 @@ class FinanceTrackerApp(ctk.CTk):
         self.select_frame_by_name("predictions")
 
     def sidebar_button_event_exit(self):
+        self.on_closing()
+        
+    def on_closing(self):
+        self.withdraw()
         self.quit()
 
 if __name__ == "__main__":
