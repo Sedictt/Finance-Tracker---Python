@@ -15,7 +15,40 @@ git clone https://github.com/Sedictt/Finance-Tracker---Python.git
 cd Finance-Tracker---Python
 ```
 
-### 2. Lipat kayo sa Branch niyo
+### 2. Setup ng Environment (Importante to!)
+Bago gumalaw, kailangan niyo i-install yung mga libraries na gamit natin (like CustomTkinter).
+
+1.  **Gawa kayo ng Virtual Environment** (Isang beses lang to gagawin):
+    ```bash
+    python -m venv .venv
+    ```
+
+2.  **I-Activate ang Virtual Environment**:
+    *   **Windows (Command Prompt)**:
+        ```bash
+        .venv\Scripts\activate
+        ```
+    *   **Windows (PowerShell)**:
+        ```bash
+        .venv\Scripts\Activate.ps1
+        ```
+    *   **Mac/Linux**:
+        ```bash
+        source .venv/bin/activate
+        ```
+
+3.  **I-install niyo mga Requirements**:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4.  **Try niyo i-run yung app**:
+    ```bash
+    python main.py
+    ```
+    *Pag lumabas yung window, goods na yan!*
+
+### 3. Lipat kayo sa Branch niyo
 Bago kayo mag-start mag-code, siguraduhin niyong nasa tamang branch kayo. Bawal mag-code sa `main`!
 
 *   **Margaux (@Margaux Delaog)**:
@@ -37,10 +70,10 @@ Bago kayo mag-start mag-code, siguraduhin niyong nasa tamang branch kayo. Bawal 
     git checkout Polishing
     ```
 
-### 3. Code na!
+### 4. Code na!
 Gawin niyo na yung tasks niyo. Since nasa sarili kayong branch, safe yan. Kahit magkamali kayo, di madadamay yung gawa ng iba.
 
-### 4. I-save ang gawa (Commit)
+### 5. I-save ang gawa (Commit)
 Pag may natapos kayong part (example: "tapos na yung login button" or "fixed yung bug"), i-save niyo na.
 ```bash
 git add .
@@ -48,7 +81,7 @@ git commit -m "Lagay niyo dito kung ano ginawa niyo"
 ```
 *Tip: Gawing clear yung message para alam namin kung para san yung code.*
 
-### 5. I-upload ang gawa (Push)
+### 6. I-upload ang gawa (Push)
 Para makita namin yung progress at ma-save sa GitHub, i-push niyo.
 ```bash
 git push origin <your-branch-name>
