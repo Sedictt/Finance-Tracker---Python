@@ -492,3 +492,10 @@ class PredictionsView(ctk.CTkFrame):
                 messagebox.showinfo("Success", f"Data exported successfully to:\n{file_path}")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to export data:\n{e}")
+
+        self.label = ctk.CTkLabel(self, text="Financial Predictions", font=ctk.CTkFont(size=24, weight="bold"))
+        self.label.grid(row=0, column=0, padx=20, pady=20)
+        
+        # Example content
+        self.predict_btn = ctk.CTkButton(self, text="Run Model")
+        self.predict_btn.grid(row=1, column=0, padx=20, pady=10)
