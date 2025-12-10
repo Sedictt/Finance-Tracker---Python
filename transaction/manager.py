@@ -32,456 +32,328 @@ try:
         like `from transaction.manager import TransactionView` continue to work.
         """
 
+        # Modern Palette to align with Dashboard
+        COLOR_BG_CARD = "#2b2b2b"
+        COLOR_PRIMARY = "#2B2D42"
+        COLOR_SECONDARY = "#8D99AE"
+        COLOR_ACCENT = "#D90429"
+        
+        COLOR_BTN_REFRESH = "#34495e"
+        COLOR_BTN_ADD = "#27ae60"
+        COLOR_BTN_DELETE = "#c0392b"
+        COLOR_BTN_SELECT_ALL = "#2980b9"
+
         def __init__(self, master, **kwargs):
             super().__init__(master, **kwargs)
-            # Initialize database on first use
             init_db()
-            # If instantiated directly inside the Dashboard (we previously
-            # injected TransactionView into `DashboardView`), skip building
-            # the full UI so the Dashboard does not show the transactions
-            # area inline. We detect by class name to avoid importing dashboard.
+            
+            # Embed check
             try:
                 if master is not None and getattr(master, "__class__", None) and master.__class__.__name__ == "DashboardView":
-                    # mark as embedded and don't build widgets
                     self._embedded_in_dashboard = True
                     return
             except Exception:
                 pass
-            # Make the frame layout expand properly when placed in the main app
-            self.grid_columnconfigure(0, weight=1)
-            # list_frame will be placed at row 2 below header and intro
-            self.grid_rowconfigure(2, weight=1)
 
-            self.label = ctk.CTkLabel(self, text="Transaction Management", font=ctk.CTkFont(size=24, weight="bold"))
-            self.label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
-
-            # Example content (kept minimal to remain a lightweight component)
-            # Intro subtitle under the main header
-            self.subtitle = ctk.CTkLabel(self, text="View, filter and manage your transactions", font=ctk.CTkFont(size=12))
-            self.subtitle.grid(row=1, column=0, padx=20, pady=(0,8), sticky="w")
-
-            # single Add button is available in the controls below; remove redundant top-level add button
-
-            # Define common categories for use in Add modal and Filter dropdown
+            # Properties
             self._income_categories = ["Salary", "Allowance", "Freelance", "Business Income", "Investments", "Gifts", "Refunds", "Other Income"]
             self._expense_categories = ["Food", "Transportation", "Shopping", "Entertainment", "Bills & Utilities", "Health & Personal Care", "Education", "Debt Payments / Loans", "Savings & Investments", "Miscellaneous", "Others"]
-            # Current active category filter (None means show all)
             self._current_filter = None
 
-            # Create a visible area that lists some transactions so the tab isn't blank
-            # Use a CTkFrame as container and place a ttk.Treeview for a proper table
-            self.list_frame = ctk.CTkFrame(self, corner_radius=8)
-            self.list_frame.grid(row=2, column=0, padx=20, pady=10, sticky="nsew")
-            # Configure list_frame to expand with parent; only the table row (2)
-            # should expand. Keep control rows compact.
-            self.list_frame.grid_columnconfigure(0, weight=1)
-            self.list_frame.grid_rowconfigure(1, weight=0)
+            # Layout Configuration
+            self.grid_columnconfigure(0, weight=1)
+            self.grid_rowconfigure(2, weight=1) # The list takes the most space
 
-            # Top controls: Add / Delete / Refresh
-            controls = ctk.CTkFrame(self.list_frame, fg_color="transparent")
-            # give slightly larger bottom padding so filter row sits further below
-            controls.grid(row=0, column=0, sticky="ew", padx=6, pady=(6, 12))
-            # Keep control buttons compact (don't stretch them across the row)
-            controls.grid_columnconfigure((0,1,2,3), weight=0)
-            controls.grid_rowconfigure(0, weight=0)
+            # --- 1. Header Section ---
+            self.header_frame = ctk.CTkFrame(self, fg_color="transparent")
+            self.header_frame.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
 
-            self.btn_add = ctk.CTkButton(controls, text="Add", width=80, command=self._on_add)
-            self.btn_add.grid(row=0, column=0, sticky="w", padx=(0,12))
-            self.btn_delete = ctk.CTkButton(controls, text="Delete", width=80, command=self._on_delete)
-            self.btn_delete.grid(row=0, column=1, sticky="w", padx=(0,12))
-            self.btn_refresh = ctk.CTkButton(controls, text="Refresh", width=80, command=self._on_refresh)
-            self.btn_refresh.grid(row=0, column=2, sticky="w", padx=(0,12))
-            # Select All / Clear selection button to support multi-delete workflows
-            self.btn_select_all = ctk.CTkButton(controls, text="Select All", width=100, command=self._on_select_all)
-            self.btn_select_all.grid(row=0, column=3, sticky="e", padx=(0,6))
+            self.title_label = ctk.CTkLabel(self.header_frame, text="Transaction Management", 
+                                          font=ctk.CTkFont(family="Roboto", size=24, weight="bold"))
+            self.title_label.pack(side="left")
 
-            # Filter controls (placed below main controls)
-            # Set a small fixed height and disable geometry propagation so the
-            # frame doesn't become too tall in some themes/environment.
-            filter_frame = ctk.CTkFrame(self.list_frame, fg_color="transparent", height=40)
-            # increase top padding so there's a clear gap from the controls
-            filter_frame.grid(row=1, column=0, sticky="ew", padx=6, pady=(12,6))
-            # Prevent children from changing the frame height
-            try:
-                filter_frame.grid_propagate(False)
-            except Exception:
-                # If CTkFrame does not implement grid_propagate, ignore silently
-                pass
-            filter_frame.grid_columnconfigure((0,1,2,3), weight=0)
+            self.subtitle = ctk.CTkLabel(self.header_frame, text="Manage your income and expenses efficiently.", 
+                                       text_color=self.COLOR_SECONDARY, font=ctk.CTkFont(size=12))
+            self.subtitle.pack(side="left", padx=10, pady=(5,0))
 
-            lbl_filter = ctk.CTkLabel(filter_frame, text="Category Filter:", font=ctk.CTkFont(weight="bold"))
-            lbl_filter.grid(row=0, column=0, padx=(2,6), sticky="w")
+            # --- 2. Controls & Filter Bar ---
+            self.controls_frame = ctk.CTkFrame(self, fg_color="transparent")
+            self.controls_frame.grid(row=1, column=0, padx=20, pady=(0, 10), sticky="ew")
+            self.controls_frame.grid_columnconfigure(5, weight=1) # Spacer to push search/filter
 
-            # Combobox for categories; values will be updated when loading DB
+            # Action Buttons
+            self.btn_add = ctk.CTkButton(self.controls_frame, text="+ Add New", command=self._on_add, 
+                                       fg_color=self.COLOR_BTN_ADD, height=32, corner_radius=16)
+            self.btn_add.grid(row=0, column=0, padx=(0, 8))
+            
+            self.btn_delete = ctk.CTkButton(self.controls_frame, text="Delete Selected", command=self._on_delete, 
+                                          fg_color=self.COLOR_BTN_DELETE, height=32, corner_radius=16)
+            self.btn_delete.grid(row=0, column=1, padx=(0, 8))
+
+            self.btn_refresh = ctk.CTkButton(self.controls_frame, text="Refresh", command=self._on_refresh, 
+                                           fg_color=self.COLOR_BTN_REFRESH, height=32, corner_radius=16, width=80)
+            self.btn_refresh.grid(row=0, column=2, padx=(0, 8))
+            
+            self.btn_select_all = ctk.CTkButton(self.controls_frame, text="Select All", command=self._on_select_all, 
+                                              fg_color=self.COLOR_BTN_SELECT_ALL, height=32, corner_radius=16, width=90)
+            self.btn_select_all.grid(row=0, column=3, padx=(0, 8))
+            
+            # Filter
             self.var_filter = tk.StringVar(value="All Categories")
-            self.combo_filter = ctk.CTkComboBox(filter_frame, values=["All Categories"], variable=self.var_filter, state="readonly", width=220)
-            self.combo_filter.grid(row=0, column=1, padx=(0,6), sticky="w")
+            self.combo_filter = ctk.CTkComboBox(self.controls_frame, values=["All Categories"], variable=self.var_filter,
+                                              width=200, state="readonly", command=self._on_apply_filter)
+            self.combo_filter.grid(row=0, column=6, sticky="e")
 
-            self.btn_apply_filter = ctk.CTkButton(filter_frame, text="Apply", width=80, command=self._on_apply_filter)
-            self.btn_apply_filter.grid(row=0, column=2, sticky="w", padx=(0,6))
-            self.btn_clear_filter = ctk.CTkButton(filter_frame, text="Clear", width=80, command=self._on_clear_filter)
-            self.btn_clear_filter.grid(row=0, column=3, sticky="w")
+            # --- 3. Transaction List (Treeview) ---
+            self.list_frame = ctk.CTkFrame(self, corner_radius=10, fg_color=self.COLOR_BG_CARD)
+            self.list_frame.grid(row=2, column=0, padx=20, pady=(0, 20), sticky="nsew")
+            self.list_frame.grid_rowconfigure(0, weight=1)
+            self.list_frame.grid_columnconfigure(0, weight=1)
 
-            # Table area
-            table_container = ctk.CTkFrame(self.list_frame)
-            table_container.grid(row=2, column=0, sticky="nsew", padx=6, pady=6)
-            table_container.grid_rowconfigure(0, weight=1)
-            table_container.grid_columnconfigure(0, weight=1)
-
-            # Create a style for dark table header
+            # Styling the Treeview
             style = ttk.Style()
             style.theme_use('clam')
-            style.configure("Treeview.Heading", background="#2b2b2b", foreground="#ffffff", relief="flat")
-            style.map("Treeview.Heading", background=[('active', '#404040')])
             
-            # Create a standard ttk.Treeview to display tabular data with all columns
-            # Allow extended selection so users can select multiple rows for deletion
-            self.tree = ttk.Treeview(table_container, columns=("id","date","type","category","amount","description"), show="headings", height=20, style="Treeview", selectmode="extended")
-            self.tree.heading("id", text="ID")
-            self.tree.heading("date", text="Date")
-            self.tree.heading("type", text="Type")
-            self.tree.heading("category", text="Category")
-            self.tree.heading("amount", text="Amount")
-            self.tree.heading("description", text="Description")
-            # Set column widths to span full table width with responsive layout
-            self.tree.column("id", width=60, anchor="center", stretch=False)
-            self.tree.column("date", width=100, anchor="center", stretch=False)
-            self.tree.column("type", width=80, anchor="center", stretch=False)
-            self.tree.column("category", width=100, anchor="center", stretch=False)
-            self.tree.column("amount", width=100, anchor="e", stretch=False)
-            self.tree.column("description", width=1, anchor="w", stretch=True)  # width=1 allows full expansion
+            # Header Style
+            style.configure("Treeview.Heading", 
+                          background="#202020", 
+                          foreground="#ffffff", 
+                          relief="flat",
+                          font=("Roboto", 14, "bold")) # Increased Font Size
+            style.map("Treeview.Heading", background=[('active', '#303030')])
+            
+            # Cell Style
+            style.configure("Treeview", 
+                          background="#2b2b2b", 
+                          fieldbackground="#2b2b2b", 
+                          foreground="#ffffff", 
+                          font=("Roboto", 12), # Increased Font Size
+                          rowheight=35,        # Increased Row Height
+                          borderwidth=0)
+            style.map("Treeview", background=[('selected', '#3498db')])
 
-            # Vertical scrollbar
-            vsb = ttk.Scrollbar(table_container, orient="vertical", command=self.tree.yview)
+            self.tree = ttk.Treeview(self.list_frame, 
+                                   columns=("id","date","type","category","amount","description"), 
+                                   show="headings", 
+                                   style="Treeview",
+                                   selectmode="extended")
+            
+            # Configure Columns
+            cols = {
+                "id": ("ID", 50, "center"),
+                "date": ("Date", 100, "center"),
+                "type": ("Type", 80, "center"),
+                "category": ("Category", 150, "w"),
+                "amount": ("Amount", 120, "e"),
+                "description": ("Description", 300, "w")
+            }
+            
+            for col, (text, width, anchor) in cols.items():
+                self.tree.heading(col, text=text)
+                self.tree.column(col, width=width, anchor=anchor)
+
+            # Scrollbars
+            vsb = ctk.CTkScrollbar(self.list_frame, orientation="vertical", command=self.tree.yview)
             self.tree.configure(yscrollcommand=vsb.set)
-            self.tree.grid(row=0, column=0, sticky="nsew")
-            vsb.grid(row=0, column=1, sticky="ns")
+            
+            self.tree.grid(row=0, column=0, sticky="nsew", padx=2, pady=2)
+            vsb.grid(row=0, column=1, sticky="ns", padx=(0,2), pady=2)
 
-            # Bind double-click on heading separator to auto-fit columns
             self.tree.bind("<Double-Button-1>", self._on_tree_header_double_click)
 
-            # Load initial data from DB
-            try:
-                self.load_table_from_db()
-            except Exception:
-                # If DB missing or empty, show sample rows
-                sample_txs = [(1, "2025-01-01", "Income", "Salary", 1000.0, "Opening Balance"), 
-                              (2, "2025-01-05", "Expense", "Food", -3.5, "Coffee")]
-                for r in sample_txs:
-                    self.tree.insert("", "end", values=(r[0], r[1], r[2], r[3], f"{r[4]:+.2f}", r[5]))
-
-            # Make tree expand (table is at row 2 after adding filter row)
-            self.list_frame.grid_rowconfigure(2, weight=1)
+            # Load Data
+            self.load_table_from_db()
 
         def _on_tree_header_double_click(self, event):
-            """Auto-fit column width when double-clicking on header separator."""
-            # Get the region (part of header where click occurred)
             region = self.tree.identify_region(event.x, event.y)
             column = self.tree.identify_column(event.x)
+            if region != "heading": return
             
-            # Only process if click is on a column header separator
-            if region != "heading":
-                return
-            
-            # Get the column index (convert from "#1" format to integer)
             try:
                 col_idx = int(column[1:]) - 1
-                columns = self.tree.cget("columns")
-                if col_idx < 0 or col_idx >= len(columns):
-                    return
-                col_name = columns[col_idx]
-            except (ValueError, IndexError):
-                return
+                col_name = self.tree.cget("columns")[col_idx]
+            except Exception: return
             
-            # Calculate required width based on content
             max_width = tkFont.Font().measure(self.tree.heading(col_name, "text"))
-            
             for item in self.tree.get_children():
                 try:
-                    item_text = str(self.tree.item(item, "values")[col_idx])
-                    item_width = tkFont.Font().measure(item_text)
-                    max_width = max(max_width, item_width)
-                except (IndexError, ValueError):
-                    pass
+                    txt = str(self.tree.item(item, "values")[col_idx])
+                    max_width = max(max_width, tkFont.Font().measure(txt))
+                except: pass
             
-            # Add padding and set the column width
-            new_width = max_width + 20
-            self.tree.column(col_name, width=new_width)
+            self.tree.column(col_name, width=max_width + 20)
 
         def load_table_from_db(self):
-            """Load rows from the SQLite DB into the Treeview."""
             try:
                 txs = load_transactions_from_db()
-            except Exception:
-                return
-            # clear
+            except Exception: return
+
             for iid in self.tree.get_children():
                 self.tree.delete(iid)
-            # gather categories to populate the filter dropdown
+                
             cats = set()
             for t in txs:
-                try:
-                    amt = f"{t.amount:+.2f}"
-                except Exception:
-                    amt = str(t.amount)
-                # Derive type from amount: positive = Income, negative = Expense
+                # Type logic
                 tx_type = "Income" if t.amount >= 0 else "Expense"
+                
+                # Filter Logic
                 cats.add(t.category)
-                # Apply active filter if set on the view
-                if getattr(self, "_current_filter", None) and self._current_filter != "All Categories":
-                    try:
-                        if t.category != self._current_filter:
-                            continue
-                    except Exception:
-                        pass
-                self.tree.insert("", "end", values=(t.id, t.date, tx_type, t.category, amt, t.description))
-            # update the filter combobox values to reflect categories in the DB
-            try:
-                values = ["All Categories"] + sorted(cats)
-                if hasattr(self, "combo_filter"):
-                    self.combo_filter.configure(values=values)
-                    cur = self.var_filter.get() if hasattr(self, "var_filter") else None
-                    if cur not in values:
-                        self.var_filter.set("All Categories")
-                        self._current_filter = None
-            except Exception:
-                pass
+                if self._current_filter and self._current_filter != "All Categories":
+                    if t.category != self._current_filter: continue
+                
+                # Formatting
+                amt_str = f"₱{abs(t.amount):,.2f}"
+                if t.amount < 0:
+                    amt_str = f"- {amt_str}"
+                else: 
+                     amt_str = f"+ {amt_str}"
+
+                self.tree.insert("", "end", values=(t.id, t.date, tx_type, t.category, amt_str, t.description))
+
+            # Update combo
+            values = ["All Categories"] + sorted(cats)
+            self.combo_filter.configure(values=values)
+            
+            # Restore selection if possible (omitted for simplicity) but ensure combo matches filter
+            if self._current_filter not in values:
+                 self.var_filter.set("All Categories")
+                 self._current_filter = None
 
         def _on_refresh(self):
             self.load_table_from_db()
 
         def _on_select_all(self):
-            """Toggle select all / clear selection for the Treeview."""
             all_items = self.tree.get_children()
-            current = set(self.tree.selection())
-            if not current or len(current) < len(all_items):
-                # select everything
+            if len(self.tree.selection()) < len(all_items):
                 self.tree.selection_set(all_items)
             else:
-                # clear selection
                 self.tree.selection_remove(all_items)
 
-        def _on_apply_filter(self):
-            """Apply the category filter selected in the combobox."""
-            try:
-                sel = self.var_filter.get() if hasattr(self, "var_filter") else None
-                if not sel or sel == "All Categories":
-                    self._current_filter = None
-                else:
-                    self._current_filter = sel
-            except Exception:
-                self._current_filter = None
+        def _on_apply_filter(self, choice):
+            # Combined apply from combobox command
+            self._current_filter = choice if choice != "All Categories" else None
             self.load_table_from_db()
-
+            
         def _on_clear_filter(self):
-            """Clear any active filter and reset the combobox to All Categories."""
-            try:
-                if hasattr(self, "var_filter"):
-                    self.var_filter.set("All Categories")
-                self._current_filter = None
-            except Exception:
-                self._current_filter = None
+            # Deprecated button, handled by "All Categories" choice now
+            self.var_filter.set("All Categories")
+            self._current_filter = None
             self.load_table_from_db()
 
         def _on_delete(self):
-            """Delete selected transactions after user confirmation."""
             sels = self.tree.selection()
             if not sels:
-                # Nothing selected — show an informative message
-                try:
-                    messagebox.showinfo("Delete Transactions", "No transactions selected to delete.")
-                except Exception:
-                    pass
+                messagebox.showinfo("Delete", "No transactions selected.")
                 return
 
-            # Collect selected IDs and a short preview for confirmation
             ids = []
-            previews = []
             for s in sels:
-                vals = self.tree.item(s, "values")
-                if not vals:
-                    continue
                 try:
-                    tid = int(vals[0])
-                    ids.append(tid)
-                    previews.append(f"{tid}: {vals[1]} {vals[4]}")
-                except Exception:
-                    continue
-
-            if not ids:
+                    ids.append(int(self.tree.item(s, "values")[0]))
+                except: pass
+            
+            if not ids: return
+            
+            if not messagebox.askyesno("Confirm", f"Delete {len(ids)} transactions?"):
                 return
 
-            # Build a concise confirmation message
-            msg = f"Delete {len(ids)} selected transaction(s)?\n"
-            # show up to 6 previews, then indicate more if present
-            sample = "\n".join(previews[:6])
-            if sample:
-                msg += "\n" + sample
-            if len(previews) > 6:
-                msg += f"\n...and {len(previews)-6} more"
-
-            try:
-                confirm = messagebox.askyesno("Confirm Delete", msg)
-            except Exception:
-                # In headless or non-standard environments fall back to yes
-                confirm = True
-
-            if not confirm:
-                return
-
-            # Perform deletion in DB
             conn = sqlite3.connect(DB_PATH)
             cur = conn.cursor()
             for tid in ids:
-                try:
-                    cur.execute("DELETE FROM transactions WHERE id = ?", (tid,))
-                except Exception:
-                    continue
+                try: cur.execute("DELETE FROM transactions WHERE id = ?", (tid,))
+                except: pass
             conn.commit()
             conn.close()
             self._on_refresh()
 
         def _next_id(self):
-            # Ensure DB is initialized
             init_db()
             conn = sqlite3.connect(DB_PATH)
             cur = conn.cursor()
             cur.execute("SELECT MAX(id) FROM transactions")
             r = cur.fetchone()
             conn.close()
-            if not r or r[0] is None:
-                return 1
-            return int(r[0]) + 1
+            return (r[0] + 1) if (r and r[0] is not None) else 1
 
         def _on_add(self):
-            # modal dialog to add a transaction with proper inputs
             top = ctk.CTkToplevel(self)
             top.title("Add Transaction")
-            top.geometry("520x380")
+            top.geometry("450x550")
             top.resizable(False, False)
+            top.grab_set() # Modal
             
-            # Define categories by type
-            income_categories = ["Salary", "Allowance", "Freelance", "Business Income", "Investments", "Gifts", "Refunds", "Other Income"]
-            expense_categories = ["Food", "Transportation", "Shopping", "Entertainment", "Bills & Utilities", "Health & Personal Care", "Education", "Debt Payments / Loans", "Savings & Investments", "Miscellaneous", "Others"]
+            # Styling for the modal
+            content = ctk.CTkFrame(top, fg_color="transparent")
+            content.pack(fill="both", expand=True, padx=20, pady=20)
             
-            # default id and date
-            nid = self._next_id()
-            
-            # Row 0: ID (read-only)
-            lbl_id = ctk.CTkLabel(top, text="ID:", font=ctk.CTkFont(weight="bold"))
-            lbl_id.grid(row=0, column=0, padx=12, pady=10, sticky="w")
-            lbl_id_value = ctk.CTkLabel(top, text=str(nid), text_color="gray")
-            lbl_id_value.grid(row=0, column=1, padx=6, pady=10, sticky="w")
+            ctk.CTkLabel(content, text="New Transaction", font=ctk.CTkFont(size=20, weight="bold")).pack(pady=(0, 20))
 
-            # Row 1: Date
-            lbl_date = ctk.CTkLabel(top, text="Date (YYYY-MM-DD):", font=ctk.CTkFont(weight="bold"))
-            lbl_date.grid(row=1, column=0, padx=12, pady=10, sticky="w")
-            ent_date = ctk.CTkEntry(top, width=200)
+            # Form Helpers
+            def create_field(label_text, widget_class, **kwargs):
+                ctk.CTkLabel(content, text=label_text, font=ctk.CTkFont(size=12, weight="bold"), text_color="gray").pack(anchor="w", pady=(5,0))
+                w = widget_class(content, **kwargs)
+                w.pack(fill="x", pady=(0, 10))
+                return w
+
+            # Fields
+            # Date
+            ent_date = create_field("Date (YYYY-MM-DD)", ctk.CTkEntry, placeholder_text="YYYY-MM-DD")
             ent_date.insert(0, datetime.date.today().isoformat())
-            ent_date.grid(row=1, column=1, padx=6, pady=10, sticky="w")
-
-            # Row 2: Type (dropdown)
-            lbl_type = ctk.CTkLabel(top, text="Type:", font=ctk.CTkFont(weight="bold"))
-            lbl_type.grid(row=2, column=0, padx=12, pady=10, sticky="w")
+            
+            # Type
             var_type = tk.StringVar(value="Income")
-            combo_type = ctk.CTkComboBox(top, values=["Income", "Expense"], variable=var_type, state="readonly", width=200)
-            combo_type.grid(row=2, column=1, padx=6, pady=10, sticky="w")
-
-            # Row 3: Category (dropdown with categories based on type)
-            lbl_cat = ctk.CTkLabel(top, text="Category:", font=ctk.CTkFont(weight="bold"))
-            lbl_cat.grid(row=3, column=0, padx=12, pady=10, sticky="w")
+            combo_type = create_field("Type", ctk.CTkComboBox, values=["Income", "Expense"], variable=var_type, state="readonly")
+            
+            # Category
             var_cat = tk.StringVar(value="Salary")
-            combo_cat = ctk.CTkComboBox(top, values=income_categories, variable=var_cat, state="readonly", width=200)
-            combo_cat.grid(row=3, column=1, padx=6, pady=10, sticky="w")
+            combo_cat = create_field("Category", ctk.CTkComboBox, values=self._income_categories, variable=var_cat)
             
-            # Function to update categories when type changes
-            def _on_type_change(_):
-                selected_type = var_type.get()
-                if selected_type == "Income":
-                    combo_cat.configure(values=income_categories)
-                    var_cat.set(income_categories[0])  # Set to first income category
-                else:  # Expense
-                    combo_cat.configure(values=expense_categories)
-                    var_cat.set(expense_categories[0])  # Set to first expense category
+            # Logic for categories
+            def _update_cats(choice):
+                if choice == "Income":
+                    combo_cat.configure(values=self._income_categories)
+                    var_cat.set(self._income_categories[0])
+                else:
+                    combo_cat.configure(values=self._expense_categories)
+                    var_cat.set(self._expense_categories[0])
+            combo_type.configure(command=_update_cats)
+
+            # Amount
+            ent_amount = create_field("Amount (₱)", ctk.CTkEntry, placeholder_text="0.00")
             
-            combo_type.configure(command=_on_type_change)
+            # Description
+            ctk.CTkLabel(content, text="Description", font=ctk.CTkFont(size=12, weight="bold"), text_color="gray").pack(anchor="w", pady=(5,0))
+            ent_desc = ctk.CTkTextbox(content, height=80)
+            ent_desc.pack(fill="x", pady=(0, 20))
 
-            # Row 4: Amount (in Peso with 2 decimals)
-            lbl_amount = ctk.CTkLabel(top, text="Amount (₱):", font=ctk.CTkFont(weight="bold"))
-            lbl_amount.grid(row=4, column=0, padx=12, pady=10, sticky="w")
-            ent_amount = ctk.CTkEntry(top, width=200, placeholder_text="0.00")
-            ent_amount.grid(row=4, column=1, padx=6, pady=10, sticky="w")
-
-            # Row 5: Description (optional)
-            lbl_desc = ctk.CTkLabel(top, text="Description (Optional):", font=ctk.CTkFont(weight="bold"))
-            lbl_desc.grid(row=5, column=0, padx=12, pady=10, sticky="nw")
-            ent_desc = ctk.CTkTextbox(top, width=200, height=60)
-            ent_desc.grid(row=5, column=1, padx=6, pady=10, sticky="nsew")
-
-            # Row 6: Buttons (Cancel and Submit)
+            # Actions
+            btn_frame = ctk.CTkFrame(content, fg_color="transparent")
+            btn_frame.pack(fill="x")
+            
             def _submit():
                 try:
-                    date_str = ent_date.get().strip()
-                    # Validate date format
-                    try:
-                        datetime.datetime.strptime(date_str, "%Y-%m-%d")
-                    except ValueError:
-                        try:
-                            messagebox.showerror("Invalid Date", "Please enter a valid date in YYYY-MM-DD format.")
-                            ent_date.focus_set()
-                        except Exception:
-                            pass
-                        return
-
-                    tx_type = var_type.get().strip() or "Income"
-                    category = var_cat.get().strip() or "Food"
-
-                    # Parse and validate amount (2 decimal places)
-                    amount_str = ent_amount.get().strip()
-                    if not amount_str:
-                        try:
-                            messagebox.showerror("Amount Required", "Amount is required. Please enter a numeric value.")
-                            ent_amount.focus_set()
-                        except Exception:
-                            pass
-                        return
-                    try:
-                        amount = float(amount_str)
-                        amount = round(amount, 2)
-                        # Make negative if Expense
-                        if tx_type == "Expense" and amount > 0:
-                            amount = -amount
-                    except ValueError:
-                        try:
-                            messagebox.showerror("Invalid Amount", "Please enter a valid number for Amount (e.g. 1234.56).")
-                            ent_amount.focus_set()
-                        except Exception:
-                            pass
-                        return
-
+                    d_str = ent_date.get().strip()
+                    datetime.datetime.strptime(d_str, "%Y-%m-%d")
+                    
+                    amt_str = ent_amount.get().strip()
+                    if not amt_str: raise ValueError("Amount missing")
+                    amt = float(amt_str)
+                    if var_type.get() == "Expense": amt = -abs(amt)
+                    else: amt = abs(amt)
+                    
+                    cat = var_cat.get().strip()
                     desc = ent_desc.get("1.0", "end").strip()
-
-                    # Create and save transaction
-                    tx = Transaction(nid, date_str, desc, amount, category)
+                    
+                    tx = Transaction(self._next_id(), d_str, desc, amt, cat)
                     save_transaction_db(tx)
+                    
                     top.destroy()
                     self._on_refresh()
                 except Exception as e:
-                    try:
-                        messagebox.showerror("Add Transaction Failed", f"Failed to add transaction: {e}")
-                    except Exception:
-                        print("Failed to add transaction:", e)
+                    messagebox.showerror("Error", str(e))
 
-            def _cancel():
-                top.destroy()
-
-            btn_frame = ctk.CTkFrame(top, fg_color="transparent")
-            btn_frame.grid(row=6, column=0, columnspan=2, pady=20)
-
-            btn_cancel = ctk.CTkButton(btn_frame, text="Cancel", command=_cancel, width=100)
-            btn_cancel.grid(row=0, column=0, padx=6)
-            btn_submit = ctk.CTkButton(btn_frame, text="Add Transaction", command=_submit, width=150)
-            btn_submit.grid(row=0, column=1, padx=6)
+            ctk.CTkButton(btn_frame, text="Cancel", fg_color="transparent", border_width=1, command=top.destroy).pack(side="left", expand=True, padx=5)
+            ctk.CTkButton(btn_frame, text="Save Transaction", command=_submit, fg_color=self.COLOR_BTN_ADD).pack(side="right", expand=True, padx=5)
 except Exception:
     # Fallback placeholder so imports do not fail in environments without GUI libs.
     class TransactionView:
