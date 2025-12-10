@@ -1,4 +1,6 @@
 import customtkinter as ctk
+
+# Import Views
 from dashboard.app import DashboardView
 from transaction.manager import TransactionView
 from analytics.report import AnalyticsView
