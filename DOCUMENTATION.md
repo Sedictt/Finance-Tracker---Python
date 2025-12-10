@@ -378,4 +378,4 @@ Developed as a Python programming project demonstrating comprehensive use of:
 
 ---
 
-*Last Updated: December 2024*
+*Last Updated: December 2025*
