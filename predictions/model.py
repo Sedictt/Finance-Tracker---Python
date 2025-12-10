@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import datetime
+import sqlite3
 from tkinter import filedialog, messagebox
  
 # -------------------------
@@ -226,15 +227,113 @@ class PredictionsView(ctk.CTkFrame):
         self.settings = new_settings
         self.run_analysis()
 
-    def generate_dummy_data(self, days=30):
-        dates = pd.date_range(end=datetime.date.today(), periods=days)
-        np.random.seed(42)
-        trend = np.linspace(0, days, days)
-        amounts = np.random.normal(50, 15, days) + trend
-        amounts = np.maximum(amounts, 0)
-        df = pd.DataFrame({'Date': dates, 'Amount': amounts})
-        df['DateOrdinal'] = df['Date'].map(datetime.datetime.toordinal)
-        return df
+    def fetch_data_from_db(self, days=30):
+        try:
+            conn = sqlite3.connect("transactions.db")
+            # Pull mostly expenses for prediction, or net? Usually spending prediction implies expenses.
+            # Let's pull expenses (amount < 0) and convert to positive for visualization
+            end_date = datetime.date.today()
+            start_date = end_date - datetime.timedelta(days=days)
+            
+            query = """
+                SELECT date, amount FROM transactions 
+                WHERE amount < 0 AND date >= ? AND date <= ?
+                ORDER BY date ASC
+            """
+            df = pd.read_sql_query(query, conn, params=(start_date.isoformat(), end_date.isoformat()))
+            conn.close()
+            
+            if df.empty:
+                return pd.DataFrame() # Handle empty
+                
+            df['Date'] = pd.to_datetime(df['date'])
+            df['Amount'] = df['amount'].abs() # Treat as positive magnitude for spending forecast
+            df['DateOrdinal'] = df['Date'].map(datetime.datetime.toordinal)
+            return df
+        except Exception as e:
+            # Fallback or error logging
+            print(f"Error fetching real data: {e}")
+            return pd.DataFrame()
+
+    def run_analysis(self):
+        # 1. Get Data
+        days = 30
+        if "60" in self.settings.get("date_range", ""): days = 60
+        elif "90" in self.settings.get("date_range", ""): days = 90
+            
+        df = self.fetch_data_from_db(days)
+        
+        if df.empty or len(df) < 2:
+            self.insights_text.configure(state="normal")
+            self.insights_text.delete("0.0", "end")
+            self.insights_text.insert("0.0", "Not enough real data to generate predictions.\n\nPlease add more transactions.")
+            self.insights_text.configure(state="disabled")
+            self.forecast_amount_label.configure(text="--")
+            self.forecast_trend_label.configure(text="INSUFFICIENT DATA", text_color="gray")
+            return
+
+        self.current_df = df
+        
+        # 2. Linear Regression (SciKit Learn)
+        X = df['DateOrdinal'].values.reshape(-1, 1)
+        y = df['Amount'].values
+        
+        model = LinearRegression()
+        model.fit(X, y)
+        self.latest_model = model
+        
+        # 3. Forecast
+        last_date_ord = df['DateOrdinal'].max()
+        future_days = 7
+        future_X = np.array([last_date_ord + i for i in range(1, future_days + 1)]).reshape(-1, 1)
+        future_y = model.predict(future_X)
+        self.latest_future_X = future_X
+        self.latest_future_y = future_y
+        
+        total_forecast = np.sum(future_y)
+        self.forecast_amount_label.configure(text=f"₱{total_forecast:,.2f}")
+        
+        # 4. Stats & Trend
+        slope = model.coef_[0]
+        mean_val = np.mean(y)
+        std_dev = np.std(y)
+        self.latest_std_dev = std_dev
+        
+        # Update Metrics
+        total_spend = np.sum(y)
+        self.stat_vars["Total"].set(f"₱{total_spend:,.2f}")
+        self.stat_vars["Mean"].set(f"₱{mean_val:,.2f}")
+        self.stat_vars["Median"].set(f"₱{np.median(y):,.2f}")
+        try:
+            mode_res = stats.mode(y, keepdims=True)
+            self.stat_vars["Mode"].set(f"₱{mode_res.mode[0]:,.2f}")
+        except:
+             self.stat_vars["Mode"].set("N/A")
+             
+        self.stat_vars["Std Dev"].set(f"₱{std_dev:,.2f}")
+        
+        if slope > 0.5:
+            self.forecast_trend_label.configure(text="TRENDING UP ↗", text_color="#FF5252") # Red
+            self.forecast_container.configure(border_color="#FF5252")
+        elif slope < -0.5:
+            self.forecast_trend_label.configure(text="TRENDING DOWN ↘", text_color="#00E676") # Green
+            self.forecast_container.configure(border_color="#00E676")
+        else:
+            self.forecast_trend_label.configure(text="STABLE →", text_color="#FFD740")
+            self.forecast_container.configure(border_color="#FFD740")
+            
+        # Insights
+        insight_text = self.generate_insights(mean_val, std_dev, slope)
+        self.insights_text.configure(state="normal")
+        self.insights_text.delete("0.0", "end")
+        self.insights_text.insert("0.0", insight_text)
+        self.insights_text.configure(state="disabled")
+        
+        self.plot_graph()
+        
+        # Ensure sidebar is open to show results
+        if not self.is_sidebar_open:
+            self.toggle_sidebar()
 
     def generate_insights(self, mean, std_dev, slope):
         insights = []
@@ -250,72 +349,7 @@ class PredictionsView(ctk.CTkFrame):
         
         return " ".join(insights)
 
-    def run_analysis(self):
-        try:
-            selection = self.settings["date_range"]
-            days = int(selection.split()[1])
-            
-            self.current_df = self.generate_dummy_data(days)
-            df = self.current_df
-            
-            # Stats
-            total_val = df['Amount'].sum()
-            mean_val = df['Amount'].mean()
-            median_val = df['Amount'].median()
-            mode_val = df['Amount'].round(0).mode()[0] if not df['Amount'].mode().empty else 0
-            std_dev = df['Amount'].std()
-            
-            self.stat_vars["Total"].set(f"${total_val:,.2f}")
-            self.stat_vars["Mean"].set(f"${mean_val:.2f}")
-            self.stat_vars["Median"].set(f"${median_val:.2f}")
-            self.stat_vars["Mode"].set(f"${mode_val:.2f}")
-            self.stat_vars["Std Dev"].set(f"${std_dev:.2f}")
-            
-            # Regression
-            X = df['DateOrdinal'].values.reshape(-1, 1)
-            y = df['Amount'].values
-            model = LinearRegression()
-            model.fit(X, y)
-            
-            last_date = df['DateOrdinal'].max()
-            future_X = np.array([last_date + i for i in range(1, 8)]).reshape(-1, 1)
-            future_y = model.predict(future_X)
-            
-            self.latest_model = model
-            self.latest_future_X = future_X
-            self.latest_future_y = future_y
-            self.latest_std_dev = std_dev
-            
-            # Forecast Card
-            pred_total = np.sum(future_y)
-            pred_avg = np.mean(future_y)
-            self.forecast_amount_label.configure(text=f"${pred_total:,.2f}")
-            
-            if pred_avg > mean_val * 1.05:
-                self.forecast_trend_label.configure(text="TRENDING UP ↑", text_color="#FF5252")
-                self.forecast_container.configure(border_color="#FF5252")
-            elif pred_avg < mean_val * 0.95:
-                self.forecast_trend_label.configure(text="TRENDING DOWN ↓", text_color="#69F0AE")
-                self.forecast_container.configure(border_color="#69F0AE")
-            else:
-                self.forecast_trend_label.configure(text="STABLE →", text_color="#FFD740")
-                self.forecast_container.configure(border_color="#FFD740")
-                
-            # Insights
-            insight_text = self.generate_insights(mean_val, std_dev, model.coef_[0])
-            self.insights_text.configure(state="normal")
-            self.insights_text.delete("0.0", "end")
-            self.insights_text.insert("0.0", insight_text)
-            self.insights_text.configure(state="disabled")
-            
-            self.plot_graph()
-            
-            # Ensure sidebar is open to show results
-            if not self.is_sidebar_open:
-                self.toggle_sidebar()
-                
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
+
 
     def plot_graph(self):
         for widget in self.graph_frame.winfo_children():
@@ -374,12 +408,10 @@ class PredictionsView(ctk.CTkFrame):
 
         # Styling
         title_text = f"Spending Analysis ({len(df)} Days)"
-        if "Simulated" not in title_text: # Avoid duplication if logic changes
-            title_text += "\n(Simulated Data)"
             
         ax.set_title(title_text, fontsize=16, color=text_color, pad=20, weight='bold')
         ax.set_xlabel("Date", fontsize=11, color=text_color, labelpad=10)
-        ax.set_ylabel("Amount ($)", fontsize=11, color=text_color, labelpad=10)
+        ax.set_ylabel("Amount (₱)", fontsize=11, color=text_color, labelpad=10)
         
         ax.tick_params(axis='x', colors=text_color, rotation=45, labelsize=9)
         ax.tick_params(axis='y', colors=text_color, labelsize=9)
@@ -413,7 +445,7 @@ class PredictionsView(ctk.CTkFrame):
             pos = sc.get_offsets()[ind["ind"][0]]
             annot.xy = pos
             date_val = mdates.num2date(pos[0])
-            text = f"{date_val.strftime('%b %d')}\n${pos[1]:.2f}" + ("\n(Forecast)" if is_fore else "")
+            text = f"{date_val.strftime('%b %d')}\n₱{pos[1]:.2f}" + ("\n(Forecast)" if is_fore else "")
             annot.set_text(text)
 
         def hover(event):

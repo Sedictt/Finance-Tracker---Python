@@ -5,8 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-# Database Configuration (matches the file in your root folder)
-DB_FILE = "finance_ctk.db"
+# Database Configuration
+DB_FILE = "transactions.db"
 
 # -------------------------
 # Modern Color Palette
@@ -101,10 +101,9 @@ class AnalyticsView(ctk.CTkFrame):
         try:
             conn = sqlite3.connect(DB_FILE)
             query = """
-                SELECT t.date, t.amount, c.name as category 
-                FROM transactions t
-                LEFT JOIN categories c ON t.category_id = c.id
-                ORDER BY t.date ASC
+                SELECT date, amount, category 
+                FROM transactions 
+                ORDER BY date ASC
             """
             df = pd.read_sql_query(query, conn)
             conn.close()
@@ -144,22 +143,22 @@ class AnalyticsView(ctk.CTkFrame):
         # 2. Daily Average Spend (Active Days span)
         days_span = (df['date'].max() - df['date'].min()).days + 1
         avg_daily = total_expense / max(1, days_span)
-        self.kpi_daily_avg.configure(text=f"${avg_daily:,.2f}")
+        self.kpi_daily_avg.configure(text=f"₱{avg_daily:,.2f}")
         
         # 3. Monthly Volatility (Std Dev of Monthly Expense)
         monthly_exp = df.groupby('month_year')['expense'].sum()
         if len(monthly_exp) > 1:
             volatility = monthly_exp.std()
-            self.kpi_volatility.configure(text=f"±${volatility:,.0f}")
+            self.kpi_volatility.configure(text=f"±₱{volatility:,.0f}")
         else:
             self.kpi_volatility.configure(text="Stable")
 
         # 4. Largest Single Expense
         max_tx = df[df['amount'] < 0]['amount'].min() # min because it's negative
         if pd.isna(max_tx):
-            self.kpi_largest_tx.configure(text="$0.00")
+            self.kpi_largest_tx.configure(text="₱0.00")
         else:
-            self.kpi_largest_tx.configure(text=f"${abs(max_tx):,.2f}")
+            self.kpi_largest_tx.configure(text=f"₱{abs(max_tx):,.2f}")
             
         # --- Draw Selected Chart ---
         fig, ax = self._get_figure()
@@ -192,7 +191,7 @@ class AnalyticsView(ctk.CTkFrame):
         ax.fill_between(df['date'], df['cumulative_balance'], alpha=0.1, color='#4CC9F0')
         
         ax.set_title("Wealth Accumulation Trajectory", fontsize=14, color='white', pad=20)
-        ax.set_ylabel("Net Balance ($)", fontsize=10, color='gray')
+        ax.set_ylabel("Net Balance (₱)", fontsize=10, color='gray')
         
         # Style
         ax.grid(True, linestyle='--', alpha=0.15)

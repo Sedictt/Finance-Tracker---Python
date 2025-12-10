@@ -29,7 +29,19 @@ COLOR_BTN_DANGER = "#c0392b"
 COLOR_HOVER_SUCCESS = "#2ecc71"
 COLOR_HOVER_DANGER = "#e74c3c"
 
-DB_FILE = "finance_ctk.db"
+DB_FILE = "transactions.db"
+
+# -------------------------
+# Sample Data
+# -------------------------
+SAMPLE_TRANSACTIONS = [
+    (datetime.date.today().isoformat(), "Salary", 5000.0, "Salary"),
+    (datetime.date.today().isoformat(), "Groceries", -3500.0, "Food"),
+    (datetime.date.today().isoformat(), "Gas", -1200.0, "Transportation"),
+    (datetime.date.today().isoformat(), "Internet Bill", -1800.0, "Bills & Utilities"),
+    (datetime.date.today().isoformat(), "Freelance Project", 2500.0, "Freelance"),
+    (datetime.date.today().isoformat(), "Coffee", -180.0, "Food"),
+]
 
 # -------------------------
 # Database utilities
@@ -42,64 +54,33 @@ def get_conn():
 def init_db():
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS accounts (
-        id INTEGER PRIMARY KEY,
-        name TEXT UNIQUE,
-        balance REAL DEFAULT 0
-    )""")
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS categories (
-        id INTEGER PRIMARY KEY,
-        name TEXT UNIQUE
-    )""")
+    # Simplified schema matching TransactionView
     cur.execute("""
     CREATE TABLE IF NOT EXISTS transactions (
         id INTEGER PRIMARY KEY,
         date TEXT,
-        account_id INTEGER,
+        description TEXT,
         amount REAL,
-        category_id INTEGER,
-        payee TEXT,
-        note TEXT
+        category TEXT
     )""")
     conn.commit()
     conn.close()
 
-def add_account_if_missing(name):
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("INSERT OR IGNORE INTO accounts (name) VALUES (?)", (name,))
-    conn.commit(); conn.close()
-
-def add_category_if_missing(name):
-    conn = get_conn(); cur = conn.cursor()
-    cur.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", (name,))
-    conn.commit(); conn.close()
-
-def insert_transaction(date, account_name, amount, category_name, payee="", note=""):
-    add_account_if_missing(account_name)
-    add_category_if_missing(category_name)
-    conn = get_conn(); cur = conn.cursor()
-    # get ids
-    cur.execute("SELECT id FROM accounts WHERE name=?", (account_name,))
-    acc_id = cur.fetchone()["id"]
-    cur.execute("SELECT id FROM categories WHERE name=?", (category_name,))
-    cat_id = cur.fetchone()["id"]
-    cur.execute("""
-        INSERT INTO transactions (date, account_id, amount, category_id, payee, note)
-        VALUES (?, ?, ?, ?, ?, ?)""",
-        (date, acc_id, amount, cat_id, payee, note))
-    # update account balance
-    cur.execute("UPDATE accounts SET balance = balance + ? WHERE id = ?", (amount, acc_id))
-    conn.commit(); conn.close()
-
-def fetch_transactions(limit=500):
+# Helper methods for adding data not strictly needed if we use TransactionView's logic,
+# but kept for compatibility if referenced elsewhere.
+def insert_transaction(date, description, amount, category):
     conn = get_conn(); cur = conn.cursor()
     cur.execute("""
-    SELECT t.id, t.date, a.name as account, t.amount, c.name as category, t.payee, t.note
-    FROM transactions t
-    LEFT JOIN accounts a ON t.account_id = a.id
-    LEFT JOIN categories c ON t.category_id = c.id
+        INSERT INTO transactions (date, description, amount, category)
+        VALUES (?, ?, ?, ?)""",
+        (date, description, amount, category))
+    conn.commit(); conn.close()
+
+def fetch_transactions(limit=50):
+    conn = get_conn(); cur = conn.cursor()
+    cur.execute("""
+    SELECT id, date, description, amount, category
+    FROM transactions
     ORDER BY date DESC
     LIMIT ?
     """, (limit,))
@@ -122,10 +103,9 @@ def fetch_summary():
 def fetch_category_breakdown(year=None, month=None):
     conn = get_conn(); cur = conn.cursor()
     q = """
-    SELECT c.name as category, SUM(ABS(t.amount)) as total
-    FROM transactions t
-    LEFT JOIN categories c ON t.category_id = c.id
-    WHERE t.amount < 0
+    SELECT category, SUM(ABS(amount)) as total
+    FROM transactions
+    WHERE amount < 0
     """
     params = []
     if year and month:
@@ -145,27 +125,12 @@ def fetch_category_breakdown(year=None, month=None):
 def clear_all_data():
     conn = get_conn(); cur = conn.cursor()
     cur.execute("DELETE FROM transactions")
-    cur.execute("DELETE FROM accounts")
-    cur.execute("DELETE FROM categories")
     conn.commit(); conn.close()
 
 # -------------------------
 # Sample data
 # -------------------------
-SAMPLE_TRANSACTIONS = [
-    ("2025-10-01", "Salary Account", 3099.00, "Income", "Employer", "Monthly salary"),
-    ("2025-10-02", "Checking", -45.50, "Food", "Cafe", ""),
-    ("2025-10-05", "Checking", -150.00, "Utilities", "Electric Co", ""),
-    ("2025-10-07", "Checking", -200.00, "Rent", "Landlord", ""),
-    ("2025-10-08", "Checking", -75.48, "Transport", "Taxi", ""),
-    ("2025-10-10", "Checking", -120.00, "Entertainment", "Cinema", ""),
-    ("2025-10-12", "Savings", -50.00, "Savings", "Bank", "Monthly save"),
-    ("2025-10-14", "Checking", -80.00, "Food", "Restaurant", ""),
-    ("2025-10-18", "Checking", -30.00, "Food", "Takeout", ""),
-    ("2025-10-20", "Checking", -60.00, "Transport", "Train", ""),
-    ("2025-10-22", "Checking", -100.00, "Utilities", "Water Co", ""),
-    ("2025-10-25", "Checking", -20.00, "Misc", "Stationery", "")
-]
+
 
 # -------------------------
 # Dashboard View
@@ -223,9 +188,9 @@ class DashboardView(ctk.CTkFrame):
         self.cards_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
         self.cards_frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
-        self.card_income = self.create_summary_card(self.cards_frame, "Total Income", "$0.00", COLOR_CARD_INCOME, 0)
-        self.card_expenses = self.create_summary_card(self.cards_frame, "Total Expenses", "$0.00", COLOR_CARD_EXPENSE, 1)
-        self.card_net = self.create_summary_card(self.cards_frame, "Net Balance", "$0.00", COLOR_CARD_NET, 2)
+        self.card_income = self.create_summary_card(self.cards_frame, "Total Income", "₱0.00", COLOR_CARD_INCOME, 0)
+        self.card_expenses = self.create_summary_card(self.cards_frame, "Total Expenses", "₱0.00", COLOR_CARD_EXPENSE, 1)
+        self.card_net = self.create_summary_card(self.cards_frame, "Net Balance", "₱0.00", COLOR_CARD_NET, 2)
         self.card_count = self.create_summary_card(self.cards_frame, "Transactions", "0", COLOR_CARD_COUNT, 3)
 
         # --- 3. Main Content Area (Split) ---
@@ -265,12 +230,6 @@ class DashboardView(ctk.CTkFrame):
                                        width=120, height=35, corner_radius=18, fg_color="#34495e")
         self.btn_refresh.pack(side="left", padx=(0, 10))
         
-        self.btn_add_sample = ctk.CTkButton(self.actions_frame, text="+ Add Sample Data", 
-                                          command=self.add_sample_data,
-                                          fg_color=COLOR_BTN_SUCCESS, hover_color=COLOR_HOVER_SUCCESS,
-                                          width=150, height=35, corner_radius=18)
-        self.btn_add_sample.pack(side="left", padx=10)
-        
         self.btn_clear = ctk.CTkButton(self.actions_frame, text="Clear Data", 
                                      command=self.clear_all_confirm,
                                      fg_color=COLOR_BTN_DANGER, hover_color=COLOR_HOVER_DANGER,
@@ -296,9 +255,9 @@ class DashboardView(ctk.CTkFrame):
     def update_all(self):
         # Update cards
         s = fetch_summary()
-        self.card_income.configure(text=f"${s['income']:,.2f}")
-        self.card_expenses.configure(text=f"${s['expenses']:,.2f}")
-        self.card_net.configure(text=f"${s['net']:,.2f}")
+        self.card_income.configure(text=f"₱{s['income']:,.2f}")
+        self.card_expenses.configure(text=f"₱{s['expenses']:,.2f}")
+        self.card_net.configure(text=f"₱{s['net']:,.2f}")
         self.card_count.configure(text=f"{s['count']}")
 
         # Update Chart
@@ -323,11 +282,13 @@ class DashboardView(ctk.CTkFrame):
             row = ctk.CTkFrame(self.recent_list, fg_color="transparent")
             row.pack(fill="x", pady=2)
             
-            # Left: Date + Payee
+            # Left: Date + Description
             info_frame = ctk.CTkFrame(row, fg_color="transparent")
             info_frame.pack(side="left", padx=5)
             
-            ctk.CTkLabel(info_frame, text=tx["payee"] or "Unknown", 
+            # Using description as main label
+            desc = tx["description"] if "description" in tx.keys() else "Unnamed"
+            ctk.CTkLabel(info_frame, text=desc, 
                        font=ctk.CTkFont(weight="bold", size=13)).pack(anchor="w")
             ctk.CTkLabel(info_frame, text=tx["date"], 
                        font=ctk.CTkFont(size=11), text_color=COLOR_TEXT_SECONDARY).pack(anchor="w")
@@ -335,17 +296,13 @@ class DashboardView(ctk.CTkFrame):
             # Right: Amount
             amt = tx["amount"]
             color = COLOR_INCOME if amt > 0 else COLOR_EXPENSES
-            ctk.CTkLabel(row, text=f"${abs(amt):,.2f}", 
+            ctk.CTkLabel(row, text=f"₱{abs(amt):,.2f}", 
                        text_color=color, font=ctk.CTkFont(weight="bold")).pack(side="right", padx=5)
             
             # Separator
             ttk.Separator(self.recent_list, orient="horizontal").pack(fill="x", pady=2)
 
-    def add_sample_data(self):
-        for t in SAMPLE_TRANSACTIONS:
-            insert_transaction(*t)
-        messagebox.showinfo("Sample Data", "Sample transactions added.")
-        self.update_all()
+
 
     def clear_all_confirm(self):
         if messagebox.askyesno("Confirm", "This will delete ALL data. Continue?"):

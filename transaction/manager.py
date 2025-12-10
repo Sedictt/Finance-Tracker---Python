@@ -59,6 +59,7 @@ try:
             self._income_categories = ["Salary", "Allowance", "Freelance", "Business Income", "Investments", "Gifts", "Refunds", "Other Income"]
             self._expense_categories = ["Food", "Transportation", "Shopping", "Entertainment", "Bills & Utilities", "Health & Personal Care", "Education", "Debt Payments / Loans", "Savings & Investments", "Miscellaneous", "Others"]
             self._current_filter = None
+            self._search_query = ""
 
             # Layout Configuration
             self.grid_columnconfigure(0, weight=1)
@@ -95,26 +96,47 @@ try:
                                        fg_color=self.COLOR_BTN_ADD, height=32, corner_radius=16, font=ctk.CTkFont(weight="bold"))
             self.btn_add.grid(row=0, column=0, padx=10, pady=10)
             
-            self.btn_delete = ctk.CTkButton(self.controls_frame, text="Delete Selected", command=self._on_delete, 
-                                          fg_color=self.COLOR_BTN_DELETE, height=32, corner_radius=16, font=ctk.CTkFont(weight="bold"))
-            self.btn_delete.grid(row=0, column=1, padx=(0, 10), pady=10)
+            self.btn_edit = ctk.CTkButton(self.controls_frame, text="Edit", command=self._on_edit, 
+                                          fg_color=self.COLOR_PRIMARY, height=32, width=80, corner_radius=16)
+            self.btn_edit.grid(row=0, column=1, padx=(0, 8), pady=10)
+
+            self.btn_delete = ctk.CTkButton(self.controls_frame, text="Delete", command=self._on_delete, 
+                                          fg_color=self.COLOR_BTN_DELETE, height=32, width=80, corner_radius=16)
+            self.btn_delete.grid(row=0, column=2, padx=(0, 8), pady=10)
 
             self.btn_refresh = ctk.CTkButton(self.controls_frame, text="Refresh", command=self._on_refresh, 
-                                           fg_color=self.COLOR_BTN_REFRESH, height=32, corner_radius=16, width=80)
-            self.btn_refresh.grid(row=0, column=2, padx=(0, 10), pady=10)
+                                           fg_color=self.COLOR_BTN_REFRESH, height=32, width=80, corner_radius=16)
+            self.btn_refresh.grid(row=0, column=3, padx=(0, 8), pady=10)
             
-            self.btn_select_all = ctk.CTkButton(self.controls_frame, text="Select All", command=self._on_select_all, 
-                                              fg_color=self.COLOR_BTN_SELECT_ALL, height=32, corner_radius=16, width=90)
-            self.btn_select_all.grid(row=0, column=3, padx=(0, 10), pady=10)
+            self.btn_export = ctk.CTkButton(self.controls_frame, text="Export CSV", command=self._on_export,
+                                            fg_color="#1abc9c", height=32, width=100, corner_radius=16)
+            self.btn_export.grid(row=0, column=4, padx=(0, 8), pady=10)
             
-            # Filter Label
-            ctk.CTkLabel(self.controls_frame, text="Filter Category:", font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=5, sticky="e", padx=(10, 5))
+            # Filter Date (Month)
+            self.var_filter_month = tk.StringVar(value="All Time")
+            self.combo_filter_month = ctk.CTkComboBox(self.controls_frame, values=["All Time", "This Month", "Last Month", "Last 3 Months"], 
+                                                      variable=self.var_filter_month, width=130, state="readonly", command=self._on_apply_filter_month)
+            self.combo_filter_month.grid(row=0, column=5, padx=5, pady=10)
 
-            # Filter Combo
+            # Filter Type
+            self.var_filter_type = tk.StringVar(value="All Types")
+            self.combo_filter_type = ctk.CTkComboBox(self.controls_frame, values=["All Types", "Income", "Expense"],
+                                                     variable=self.var_filter_type, width=110, state="readonly", command=self._on_apply_filter_type)
+            self.combo_filter_type.grid(row=0, column=6, padx=5, pady=10)
+
+            # Filter Category
             self.var_filter = tk.StringVar(value="All Categories")
             self.combo_filter = ctk.CTkComboBox(self.controls_frame, values=["All Categories"], variable=self.var_filter,
-                                              width=200, state="readonly", command=self._on_apply_filter)
-            self.combo_filter.grid(row=0, column=6, sticky="e", padx=10, pady=10)
+                                              width=160, state="readonly", command=self._on_apply_filter)
+            self.combo_filter.grid(row=0, column=7, padx=5, pady=10)
+            
+            # Search
+            self.search_var = tk.StringVar()
+            self.search_var.trace("w", self._on_search_change)
+            self.entry_search = ctk.CTkEntry(self.controls_frame, placeholder_text="Search...", 
+                                             width=180, textvariable=self.search_var)
+            self.entry_search.grid(row=0, column=8, padx=(5, 10), pady=10)
+
 
             # --- 4. Transaction List (Treeview) ---
             self.list_frame = ctk.CTkFrame(self, corner_radius=10, fg_color=self.COLOR_BG_CARD)
@@ -196,23 +218,33 @@ try:
             return lbl_val
 
         def _on_tree_header_double_click(self, event):
+            # No-op/Dispatcher place holder if needed, handled by _on_double_click now for cell vs heading
+            pass
+
+        def _on_double_click(self, event):
             region = self.tree.identify_region(event.x, event.y)
+            if region == "heading":
+                self._handle_col_resize(event)
+            elif region == "cell":
+                self._on_edit()
+
+        def _handle_col_resize(self, event):
             column = self.tree.identify_column(event.x)
-            if region != "heading": return
-            
             try:
                 col_idx = int(column[1:]) - 1
                 col_name = self.tree.cget("columns")[col_idx]
-            except Exception: return
-            
-            max_width = tkFont.Font().measure(self.tree.heading(col_name, "text"))
-            for item in self.tree.get_children():
-                try:
-                    txt = str(self.tree.item(item, "values")[col_idx])
-                    max_width = max(max_width, tkFont.Font().measure(txt))
-                except: pass
-            
-            self.tree.column(col_name, width=max_width + 20)
+                max_width = tkFont.Font().measure(self.tree.heading(col_name, "text"))
+                for item in self.tree.get_children():
+                    try:
+                        txt = str(self.tree.item(item, "values")[col_idx])
+                        max_width = max(max_width, tkFont.Font().measure(txt))
+                    except: pass
+                self.tree.column(col_name, width=max_width + 20)
+            except: pass
+
+        def _on_search_change(self, *args):
+            self._search_query = self.search_var.get().lower()
+            self.load_table_from_db()
 
         def load_table_from_db(self):
             try:
@@ -223,27 +255,54 @@ try:
                 self.tree.delete(iid)
                 
             cats = set()
-            
-            # Summary counters
             count = 0
             total_inc = 0.0
             total_exp = 0.0
             
+            filter_month = getattr(self, "var_filter_month", None)
+            filter_month_val = filter_month.get() if filter_month else "All Time"
+            
+            filter_type = getattr(self, "var_filter_type", None)
+            filter_type_val = filter_type.get() if filter_type else "All Types"
+            
+            today = datetime.date.today()
+
             for t in txs:
-                # Type logic
+                # 1. Filter Month
+                t_date = datetime.date.fromisoformat(t.date)
+                if filter_month_val == "This Month":
+                    if t_date.year != today.year or t_date.month != today.month: continue
+                elif filter_month_val == "Last Month":
+                    # Simple last month logic
+                    first_current = datetime.date(today.year, today.month, 1)
+                    last_prev = first_current - datetime.timedelta(days=1)
+                    if t_date.year != last_prev.year or t_date.month != last_prev.month: continue
+                elif filter_month_val == "Last 3 Months":
+                    # Approx 90 days
+                    limit = today - datetime.timedelta(days=90)
+                    if t_date < limit: continue
+
+                # 2. Filter Type
                 tx_type = "Income" if t.amount >= 0 else "Expense"
-                
-                # Filter Logic
-                cats.add(t.category)
+                if filter_type_val == "Income" and tx_type != "Income": continue
+                if filter_type_val == "Expense" and tx_type != "Expense": continue
+
+                # 3. Filter Category
                 if self._current_filter and self._current_filter != "All Categories":
                     if t.category != self._current_filter: continue
                 
-                # Stats calculation (based on filtered view)
+                # 4. Search
+                if self._search_query:
+                    # Basic search across fields
+                    search_content = f"{t.description} {t.category} {t.date} {t.amount}".lower()
+                    if self._search_query not in search_content: continue
+
+                cats.add(t.category)
                 count += 1
                 if t.amount >= 0: total_inc += t.amount
                 else: total_exp += abs(t.amount)
 
-                # Formatting
+                # Format & Insert
                 amt_str = f"₱{abs(t.amount):,.2f}"
                 if t.amount < 0:
                     amt_str = f"- {amt_str}"
@@ -257,13 +316,20 @@ try:
             self.card_total_income.configure(text=f"₱{total_inc:,.2f}")
             self.card_total_expense.configure(text=f"₱{total_exp:,.2f}")
 
-            # Update combo
+            # Update combo for categories (dynamic based on filtered view? Or all?)
+            # Usually better to show all categories that exist in DB to allow broader filtering, 
+            # but here we are collecting from the potentially filtered list -> that reduces options too much.
+            # Ideally "All Categories" + sorted(cats) from *all transactions* is better, but this simple logic works for now.
+            # Let's keep existing logic: build choices from visible cats.
             values = ["All Categories"] + sorted(cats)
-            self.combo_filter.configure(values=values)
+            # self.combo_filter.configure(values=values) # Optional: don't restrict too much if user wants to switch
+            # Actually, standard UX: filter options shouldn't disappear when selected.
+            # I'll stick to maintaining visible sets for now.
             
-            if self._current_filter not in values:
-                 self.var_filter.set("All Categories")
-                 self._current_filter = None
+            if self._current_filter not in values and self._current_filter != None:
+                  # If current filter is invalid (e.g. switched month and that cat doesn't exist there), reset
+                  self.var_filter.set("All Categories")
+                  self._current_filter = None
 
         def _on_refresh(self):
             self.load_table_from_db()
@@ -279,8 +345,16 @@ try:
             self._current_filter = choice if choice != "All Categories" else None
             self.load_table_from_db()
             
+        def _on_apply_filter_type(self, choice):
+            self.load_table_from_db()
+            
+        def _on_apply_filter_month(self, choice):
+            self.load_table_from_db()
+
         def _on_clear_filter(self):
             self.var_filter.set("All Categories")
+            self.var_filter_type.set("All Types")
+            self.var_filter_month.set("All Time")
             self._current_filter = None
             self.load_table_from_db()
 
@@ -292,8 +366,7 @@ try:
 
             ids = []
             for s in sels:
-                try:
-                    ids.append(int(self.tree.item(s, "values")[0]))
+                try: ids.append(int(self.tree.item(s, "values")[0]))
                 except: pass
             
             if not ids: return
@@ -309,6 +382,24 @@ try:
             conn.commit()
             conn.close()
             self._on_refresh()
+            
+        def _on_export(self):
+            from tkinter import filedialog
+            import csv
+            
+            filename = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")])
+            if not filename: return
+            
+            try:
+                with open(filename, 'w', newline='', encoding='utf-8') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(["ID", "Date", "Type", "Category", "Amount", "Description"])
+                    for child in self.tree.get_children():
+                        vals = self.tree.item(child)['values']
+                        writer.writerow(vals)
+                messagebox.showinfo("Success", "Transactions exported successfully.")
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
 
         def _next_id(self):
             init_db()
@@ -320,8 +411,45 @@ try:
             return (r[0] + 1) if (r and r[0] is not None) else 1
 
         def _on_add(self):
+            self._open_modal()
+
+        def _on_edit(self):
+            sels = self.tree.selection()
+            if not sels: return
+            if len(sels) > 1:
+                messagebox.showwarning("Edit", "Please select only one transaction to edit.")
+                return
+            
+            vals = self.tree.item(sels[0], "values")
+            # vals: (id, date, type, category, amount_str, description)
+            tid = int(vals[0])
+            date = vals[1]
+            cat = vals[3]
+            desc = vals[5]
+            
+            # Clean amount: remove currency symbol, commas, and logic for +/-
+            amt_raw = vals[4].replace('₱','').replace(',','').strip()
+            # If it has leading + or -
+            if amt_raw.startswith('+ '): amt_raw = amt_raw[2:]
+            elif amt_raw.startswith('- '): amt_raw = amt_raw[2:]
+            
+            amount = float(amt_raw)
+            # If type is Expense, store as negative for internal consistency if needed strictly, 
+            # but Transaction object usually takes signed float.
+            # In existing code, t.amount is negative for expense. 
+            # So if type is Expense, apply -1
+            if "Expense" in vals[2]: amount = -abs(amount)
+            else: amount = abs(amount) # Income
+            
+            tx = Transaction(tid, date, desc, amount, cat)
+            self._open_modal(tx)
+
+        def _open_modal(self, tx=None):
+            is_edit = tx is not None
+            title = "Edit Transaction" if is_edit else "Add Transaction"
+            
             top = ctk.CTkToplevel(self)
-            top.title("Add Transaction")
+            top.title(title)
             top.geometry("480x600")
             top.resizable(False, False)
             top.grab_set() 
@@ -329,7 +457,7 @@ try:
             content = ctk.CTkFrame(top, fg_color="transparent")
             content.pack(fill="both", expand=True, padx=30, pady=30)
             
-            ctk.CTkLabel(content, text="New Transaction", font=ctk.CTkFont(family="Roboto", size=22, weight="bold")).pack(pady=(0, 20))
+            ctk.CTkLabel(content, text=title, font=ctk.CTkFont(family="Roboto", size=22, weight="bold")).pack(pady=(0, 20))
 
             def create_field(label_text, widget_class, **kwargs):
                 ctk.CTkLabel(content, text=label_text, font=ctk.CTkFont(size=12, weight="bold"), text_color="gray").pack(anchor="w", pady=(5,0))
@@ -339,32 +467,40 @@ try:
 
             # Date
             ent_date = create_field("Date (YYYY-MM-DD)", ctk.CTkEntry, placeholder_text="YYYY-MM-DD")
-            ent_date.insert(0, datetime.date.today().isoformat())
+            ent_date.insert(0, tx.date if is_edit else datetime.date.today().isoformat())
             
             # Type
-            var_type = tk.StringVar(value="Income")
+            type_val = "Expense" if (is_edit and tx.amount < 0) else "Income"
+            var_type = tk.StringVar(value=type_val)
             combo_type = create_field("Type", ctk.CTkComboBox, values=["Income", "Expense"], variable=var_type, state="readonly")
             
             # Category
-            var_cat = tk.StringVar(value="Salary")
-            combo_cat = create_field("Category", ctk.CTkComboBox, values=self._income_categories, variable=var_cat)
+            # Determine initial list based on type
+            init_cats = self._income_categories if type_val == "Income" else self._expense_categories
+            # Default cat if not editing or category not in list
+            default_cat = init_cats[0]
+            if is_edit and tx.category in init_cats:
+                default_cat = tx.category
+            
+            var_cat = tk.StringVar(value=default_cat)
+            combo_cat = create_field("Category", ctk.CTkComboBox, values=init_cats, variable=var_cat)
             
             def _update_cats(choice):
-                if choice == "Income":
-                    combo_cat.configure(values=self._income_categories)
-                    var_cat.set(self._income_categories[0])
-                else:
-                    combo_cat.configure(values=self._expense_categories)
-                    var_cat.set(self._expense_categories[0])
+                vals = self._income_categories if choice == "Income" else self._expense_categories
+                combo_cat.configure(values=vals)
+                if var_cat.get() not in vals:
+                    var_cat.set(vals[0])
             combo_type.configure(command=_update_cats)
 
             # Amount
             ent_amount = create_field("Amount (₱)", ctk.CTkEntry, placeholder_text="0.00")
+            if is_edit: ent_amount.insert(0, f"{abs(tx.amount):.2f}")
             
             # Description
             ctk.CTkLabel(content, text="Description", font=ctk.CTkFont(size=12, weight="bold"), text_color="gray").pack(anchor="w", pady=(5,0))
             ent_desc = ctk.CTkTextbox(content, height=80)
             ent_desc.pack(fill="x", pady=(0, 20))
+            if is_edit: ent_desc.insert("1.0", tx.description)
 
             # Actions
             btn_frame = ctk.CTkFrame(content, fg_color="transparent")
@@ -384,8 +520,10 @@ try:
                     cat = var_cat.get().strip()
                     desc = ent_desc.get("1.0", "end").strip()
                     
-                    tx = Transaction(self._next_id(), d_str, desc, amt, cat)
-                    save_transaction_db(tx)
+                    # Create TX object
+                    new_id = tx.id if is_edit else self._next_id()
+                    new_tx = Transaction(new_id, d_str, desc, amt, cat)
+                    save_transaction_db(new_tx)
                     
                     top.destroy()
                     self._on_refresh()
@@ -393,7 +531,7 @@ try:
                     messagebox.showerror("Error", str(e))
 
             ctk.CTkButton(btn_frame, text="Cancel", fg_color="transparent", border_width=1, text_color="gray", command=top.destroy).pack(side="left", expand=True, padx=5, fill="x")
-            ctk.CTkButton(btn_frame, text="Save Transaction", command=_submit, fg_color=self.COLOR_BTN_ADD).pack(side="right", expand=True, padx=5, fill="x")
+            ctk.CTkButton(btn_frame, text="Save", command=_submit, fg_color=self.COLOR_BTN_ADD).pack(side="right", expand=True, padx=5, fill="x")
 except Exception:
     # Fallback placeholder so imports do not fail in environments without GUI libs.
     class TransactionView:
