@@ -167,55 +167,25 @@ SAMPLE_TRANSACTIONS = [
 ]
 
 # -------------------------
-# UI Application
+# Dashboard View
 # -------------------------
-class FinanceApp(ctk.CTk):
-    def __init__(self):
-        super().__init__()
-        self.title("Personal Finance Tracker")
-        self.geometry("1000x700")
-        ctk.set_appearance_mode("System")
-        ctk.set_default_color_theme("blue")
-
-        # Top bar
-        self.top_frame = ctk.CTkFrame(self, height=70)
-        self.top_frame.pack(fill="x", side="top")
-
-        self.title_label = ctk.CTkLabel(self.top_frame, text=" Personal Finance Tracker",
-                                        font=ctk.CTkFont(size=20, weight="bold"))
-        self.title_label.pack(side="left", padx=16, pady=12)
-
-        # Tab view
-        self.tabview = ctk.CTkTabview(self, width=980, height=580)
-        self.tabview.pack(padx=12, pady=8, fill="both", expand=True)
-        self.tabview.add("Dashboard")
-        self.tabview.add("Add Transaction")
-        self.tabview.add("Transactions")
-        self.tabview.add("Analytics")
-        self.tabview.add("Predictions")
-
-        self._build_dashboard_tab()
-        self._build_add_tab()
-        self._build_transactions_tab()
-        self._build_analytics_tab()
-        self._build_predictions_tab()
-
+class DashboardView(ctk.CTkFrame):
+    def __init__(self, master, **kwargs):
+        super().__init__(master, **kwargs)
+        
+        # Initialize database
         init_db()
-        self.update_all()
 
-        # ensure Dashboard is the active tab by default
-        self.tabview.set("Dashboard")
-
-    # -------------------------
-    # Dashboard Tab
-    # -------------------------
-    def _build_dashboard_tab(self):
-        tab = self.tabview.tab("Dashboard")
-        tab.grid_columnconfigure(0, weight=1)
+        # Layout
+        self.grid_columnconfigure(0, weight=1)
+        
+        # Title
+        self.title_label = ctk.CTkLabel(self, text="Dashboard Overview", font=ctk.CTkFont(size=24, weight="bold"))
+        self.title_label.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="w")
 
         # Cards frame
-        cards_frame = ctk.CTkFrame(tab)
-        cards_frame.grid(row=0, column=0, sticky="ew", padx=16, pady=12)
+        cards_frame = ctk.CTkFrame(self)
+        cards_frame.grid(row=1, column=0, sticky="ew", padx=16, pady=12)
         cards_frame.grid_columnconfigure((0,1,2,3), weight=1)
 
         self.card_income = ctk.CTkFrame(cards_frame, fg_color=COLOR_INCOME)
@@ -247,66 +217,29 @@ class FinanceApp(ctk.CTk):
         self.label_cnt_val.pack(anchor="w", padx=12, pady=(0,12))
 
         # Quick actions
-        actions_frame = ctk.CTkFrame(tab)
-        actions_frame.grid(row=1, column=0, sticky="ew", padx=16)
+        actions_frame = ctk.CTkFrame(self)
+        actions_frame.grid(row=2, column=0, sticky="ew", padx=16)
         actions_frame.grid_columnconfigure((0,1,2,3), weight=1)
 
         btn_refresh = ctk.CTkButton(actions_frame, text="Refresh", command=self.update_all, width=120)
         btn_refresh.grid(row=0, column=0, padx=8, pady=12, sticky="w")
-        btn_transactions = ctk.CTkButton(actions_frame, text="Transactions", command=lambda: self.tabview.set("Transactions"))
-        btn_transactions.grid(row=0, column=1, padx=8, pady=12, sticky="w")
+        
         btn_add_sample = ctk.CTkButton(actions_frame, text="Add Sample Data", fg_color=COLOR_BTN_SUCCESS, hover_color=COLOR_HOVER_SUCCESS, command=self.add_sample_data)
-        btn_add_sample.grid(row=0, column=2, padx=8, pady=12, sticky="w")
+        btn_add_sample.grid(row=0, column=1, padx=8, pady=12, sticky="w")
+        
         btn_clear = ctk.CTkButton(actions_frame, text="Clear All", fg_color=COLOR_BTN_DANGER, hover_color=COLOR_HOVER_DANGER, command=self.clear_all_confirm)
-        btn_clear.grid(row=0, column=3, padx=8, pady=12, sticky="w")
+        btn_clear.grid(row=0, column=2, padx=8, pady=12, sticky="w")
 
         # Spending by category (pie)
-        chart_frame = ctk.CTkFrame(tab)
-        chart_frame.grid(row=2, column=0, sticky="nsew", padx=16, pady=(6,16))
+        chart_frame = ctk.CTkFrame(self)
+        chart_frame.grid(row=3, column=0, sticky="nsew", padx=16, pady=(6,16))
         chart_frame.grid_rowconfigure(0, weight=1)
         chart_frame.grid_columnconfigure(0, weight=1)
         self.pie_container = chart_frame
 
-    # -------------------------
-    # Add Transaction Tab
-    # -------------------------
-    def _build_add_tab(self):
-        tab = self.tabview.tab("Add Transaction")
-        # keep tab present but minimal — dashboard-only work in progress
-        container = ctk.CTkFrame(tab)
-        container.pack(fill="both", expand=True, padx=16, pady=16)
-        ctk.CTkLabel(container, text="Add Transaction — not implemented (dashboard-only)", justify="center").pack(expand=True)
+        # Initial load
+        self.update_all()
 
-    # -------------------------
-    # Transactions Tab
-    # -------------------------
-    def _build_transactions_tab(self):
-        tab = self.tabview.tab("Transactions")
-        container = ctk.CTkFrame(tab)
-        container.pack(fill="both", expand=True, padx=16, pady=16)
-        ctk.CTkLabel(container, text="Transactions — not implemented (dashboard-only)", justify="center").pack(expand=True)
-
-    # -------------------------
-    # Analytics Tab
-    # -------------------------
-    def _build_analytics_tab(self):
-        tab = self.tabview.tab("Analytics")
-        container = ctk.CTkFrame(tab)
-        container.pack(fill="both", expand=True, padx=16, pady=16)
-        ctk.CTkLabel(container, text="Analytics — not implemented (dashboard-only)", justify="center").pack(expand=True)
-
-    # -------------------------
-    # Predictions Tab
-    # -------------------------
-    def _build_predictions_tab(self):
-        tab = self.tabview.tab("Predictions")
-        container = ctk.CTkFrame(tab)
-        container.pack(fill="both", expand=True, padx=16, pady=16)
-        ctk.CTkLabel(container, text="Predictions — not implemented (dashboard-only)", justify="center").pack(expand=True)
-
-    # -------------------------
-    # Actions & UI Updaters
-    # -------------------------
     def update_all(self):
         # Update cards
         s = fetch_summary()
@@ -315,48 +248,9 @@ class FinanceApp(ctk.CTk):
         self.label_net_val.configure(text=f"${s['net']:.2f}")
         self.label_cnt_val.configure(text=f"{s['count']}")
 
-        # Update transactions list if the tree widget exists
-        if hasattr(self, "tree") and isinstance(getattr(self, "tree"), ttk.Treeview):
-            for r in self.tree.get_children():
-                self.tree.delete(r)
-            for row in fetch_transactions(500):
-                self.tree.insert("", "end", values=(row["id"], row["date"], row["account"], f"{row['amount']:.2f}", row["category"], row["payee"], row["note"]))
-
         # Update dashboard pie chart if container exists
         if hasattr(self, "pie_container"):
             self._draw_pie(self.pie_container)
-
-        # Update analytics if analytics widgets exist
-        if hasattr(self, "stats_text") and hasattr(self, "analytics_chart_container"):
-            self._update_analytics()
-
-    def on_add_transaction(self):
-        date = self.entry_date.get().strip() or datetime.date.today().isoformat()
-        
-        try:
-            datetime.date.fromisoformat(date)
-        except ValueError:
-            messagebox.showerror("Invalid Date", "Please use YYYY-MM-DD format.")
-            return
-        
-        acct = self.entry_account.get().strip() or "Checking"
-        try:
-            amount = float(self.entry_amount.get().strip())
-        except ValueError:
-            messagebox.showerror("Invalid Amount", "Please enter a valid number for amount.")
-            return
-        cat = self.entry_category.get().strip() or "Misc"
-        payee = self.entry_payee.get().strip()
-        note = self.entry_note.get().strip()
-
-        insert_transaction(date, acct, amount, cat, payee, note)
-        messagebox.showinfo("Added", "Transaction added.")
-        # clear form
-        self.entry_amount.delete(0, "end")
-        self.entry_payee.delete(0, "end")
-        self.entry_note.delete(0, "end")
-        self.update_all()
-        self.tabview.set("Dashboard")
 
     def add_sample_data(self):
         for t in SAMPLE_TRANSACTIONS:
@@ -371,9 +265,6 @@ class FinanceApp(ctk.CTk):
             messagebox.showinfo("Cleared", "All data removed.")
             self.update_all()
 
-    # -------------------------
-    # Charts
-    # -------------------------
     def _draw_pie(self, container, year=None, month=None):
         # remove previous canvas if exists
         for w in container.winfo_children():
@@ -397,60 +288,3 @@ class FinanceApp(ctk.CTk):
         canvas_widget = canvas.get_tk_widget()
         canvas_widget.pack(fill="both", expand=True, padx=6, pady=6)
         canvas.draw()
-
-    def _update_analytics(self):
-        # basic stats to left panel
-        rows = fetch_transactions(1000)
-        amounts = [r["amount"] for r in rows]
-        incomes = [a for a in amounts if a > 0]
-        expenses = [-a for a in amounts if a < 0]
-
-        stats_lines = []
-        stats_lines.append(f"Total transactions: {len(amounts)}")
-        stats_lines.append(f"Total income: ${sum(incomes):.2f}")
-        stats_lines.append(f"Total expenses: ${sum(expenses):.2f}")
-        if expenses:
-            stats_lines.append(f"Avg expense: ${statistics.mean(expenses):.2f}")
-            stats_lines.append(f"Median expense: ${statistics.median(expenses):.2f}")
-            try:
-                mode_val = stats.mode(expenses, keepdims=True).mode[0]
-                stats_lines.append(f"Mode expense: ${mode_val:.2f}")
-            except Exception:
-                stats_lines.append(f"Mode expense: n/a")
-            stats_lines.append(f"Std dev (expenses): ${statistics.pstdev(expenses):.2f}")
-        self.stats_text.configure(text="\n".join(stats_lines))
-
-        # update analytics pie
-        self._draw_pie(self.analytics_chart_container)
-
-    # -------------------------
-    # Prediction
-    # -------------------------
-    def run_prediction(self):
-        rows = fetch_transactions(500)
-        # use absolute values of recent expenses (negative amounts)
-        recent_expenses = [abs(r["amount"]) for r in reversed(rows) if r["amount"] < 0]  # chronological
-        if len(recent_expenses) < 3:
-            self.pred_label.configure(text="Not enough expense history (need at least 3 expenses).")
-            return
-
-        # use simple linear regression over expense index -> amount
-        X = np.arange(len(recent_expenses)).reshape(-1,1)
-        y = np.array(recent_expenses)
-        model = LinearRegression()
-        model.fit(X, y)
-        next_idx = np.array([[len(recent_expenses)]])
-        pred = model.predict(next_idx)[0]
-        # clamp prediction
-        pred = max(0.0, float(pred))
-        trend = "increasing" if model.coef_[0] > 0 else "decreasing" if model.coef_[0] < 0 else "flat"
-        self.pred_label.configure(text=f"Predicted next expense: ${pred:.2f}  (trend: {trend})")
-
-# -------------------------
-# Run App
-# -------------------------
-if __name__ == "__main__":
-    init_db()
-    app = FinanceApp()
-    app.mainloop()
-

@@ -1,5 +1,10 @@
 import customtkinter as ctk
-from dashboard.app import FinanceApp
+
+# Import Views
+from dashboard.app import DashboardView
+from transaction.manager import TransactionView
+from analytics.report import AnalyticsView
+from predictions.model import PredictionsView
 
 ctk.set_appearance_mode("System")  # Modes: "System" (standard), "Dark", "Light"
 ctk.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
@@ -103,5 +108,5 @@ class FinanceTrackerApp(ctk.CTk):
         self.quit()
 
 if __name__ == "__main__":
-    app = FinanceApp()
+    app = FinanceTrackerApp()
     app.mainloop()
