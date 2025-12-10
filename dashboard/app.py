@@ -1,3 +1,4 @@
+import customtkinter as ctk;
 import customtkinter as ctk
 import sqlite3
 import datetime
@@ -183,6 +184,12 @@ class DashboardView(ctk.CTkFrame):
         self.title_label = ctk.CTkLabel(self, text="Dashboard Overview", font=ctk.CTkFont(size=24, weight="bold"))
         self.title_label.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="w")
 
+        self.label = ctk.CTkLabel(self, text="Dashboard View", font=ctk.CTkFont(size=24, weight="bold"))
+        self.label.grid(row=0, column=0, padx=20, pady=20)
+
+        # Example content
+        self.info_label = ctk.CTkLabel(self, text="Welcome to your financial overview.")
+        self.info_label.grid(row=1, column=0, padx=20, pady=10)
         # Cards frame
         cards_frame = ctk.CTkFrame(self)
         cards_frame.grid(row=1, column=0, sticky="ew", padx=16, pady=12)
