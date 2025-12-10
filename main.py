@@ -3,7 +3,7 @@ import customtkinter as ctk
 # Import Views
 from dashboard.app import DashboardView
 from transaction.manager import TransactionView
-from analytics.report import AnalyticsView
+from Analytics.analytics import AnalyticsView
 from predictions.model import PredictionsView
 
 ctk.set_appearance_mode("System")  # Modes: "System" (standard), "Dark", "Light"
