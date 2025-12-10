@@ -7,6 +7,15 @@ import matplotlib.dates as mdates
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import datetime
 from tkinter import filedialog, messagebox
+ 
+# -------------------------
+# Modern Color Palette
+# -------------------------
+COLOR_BG_CARD = "#2b2b2b"
+COLOR_PRIMARY = "#2B2D42"
+COLOR_SECONDARY = "#8D99AE"
+COLOR_ACCENT = "#D90429"
+COLOR_TEXT_PRIMARY = "#FFFFFF"
 
 class AnalysisSettingsModal(ctk.CTkToplevel):
     def __init__(self, parent, current_settings, on_run_callback):
@@ -109,53 +118,62 @@ class PredictionsView(ctk.CTkFrame):
         self.top_bar = ctk.CTkFrame(self, height=60, fg_color="transparent")
         self.top_bar.grid(row=0, column=0, columnspan=2, sticky="ew", padx=20, pady=(10, 0))
         
-        self.title_lbl = ctk.CTkLabel(self.top_bar, text="Financial Predictions", font=ctk.CTkFont(size=24, weight="bold"))
+        self.title_lbl = ctk.CTkLabel(self.top_bar, text="Financial Predictions", 
+                                    font=ctk.CTkFont(family="Roboto", size=24, weight="bold"))
         self.title_lbl.pack(side="left", pady=10)
         
         self.subtitle_lbl = ctk.CTkLabel(self.top_bar, text=" |  AI-powered Spending Analysis", 
-                                       font=ctk.CTkFont(size=14), text_color="gray60")
+                                       font=ctk.CTkFont(family="Roboto", size=14), text_color=COLOR_SECONDARY)
         self.subtitle_lbl.pack(side="left", pady=10, padx=10)
         
         # Top Bar Actions
         self.settings_btn = ctk.CTkButton(self.top_bar, text="⚙️ Settings", width=100, 
-                                        command=self.open_settings, fg_color="#2B2B2B", border_width=1, border_color="gray50")
+                                        command=self.open_settings, fg_color=COLOR_BG_CARD, border_width=1, border_color="gray50")
         self.settings_btn.pack(side="right", padx=10)
         
         self.toggle_side_btn = ctk.CTkButton(self.top_bar, text="Show Report ◂", width=100,
-                                           command=self.toggle_sidebar, fg_color="#2B2B2B", border_width=1, border_color="gray50")
+                                           command=self.toggle_sidebar, fg_color=COLOR_BG_CARD, border_width=1, border_color="gray50")
         self.toggle_side_btn.pack(side="right")
 
         # --- Main Graph Area ---
-        self.graph_frame = ctk.CTkFrame(self, corner_radius=15)
+        self.graph_frame = ctk.CTkFrame(self, corner_radius=15, fg_color=COLOR_BG_CARD)
         self.graph_frame.grid(row=1, column=0, sticky="nsew", padx=20, pady=20)
         
         self.empty_graph_label = ctk.CTkLabel(self.graph_frame, text="Open Settings to Run Analysis",
-                                            font=ctk.CTkFont(size=16), text_color="gray50")
+                                            font=ctk.CTkFont(family="Roboto", size=16), text_color="gray50")
         self.empty_graph_label.place(relx=0.5, rely=0.5, anchor="center")
         
         # --- Sidebar (Report Panel) ---
-        self.sidebar = ctk.CTkScrollableFrame(self, width=300, corner_radius=0, fg_color=("gray90", "gray15"))
+        self.sidebar = ctk.CTkScrollableFrame(self, width=300, corner_radius=0, fg_color=("gray90", "#1a1a1a"))
         self.sidebar.grid(row=1, column=1, sticky="nsew", padx=(0, 0), pady=0)
         
         self.setup_sidebar()
+        
+        # Auto-run analysis on load
+        self.after(500, self.run_analysis)
 
     def setup_sidebar(self):
         # Sidebar Content
-        self.report_title = ctk.CTkLabel(self.sidebar, text="Analysis Report", font=ctk.CTkFont(size=18, weight="bold"))
+        self.report_title = ctk.CTkLabel(self.sidebar, text="Analysis Report", 
+                                       font=ctk.CTkFont(family="Roboto", size=18, weight="bold"))
         self.report_title.pack(pady=(20, 10), padx=20, anchor="w")
         
         # Forecast Card
-        self.forecast_container = ctk.CTkFrame(self.sidebar, fg_color=("white", "gray20"), corner_radius=10, border_width=2, border_color="#3B8ED0")
+        self.forecast_container = ctk.CTkFrame(self.sidebar, fg_color=("white", "#252525"), corner_radius=10, border_width=2, border_color="#3B8ED0")
         self.forecast_container.pack(fill="x", padx=15, pady=10)
         
-        ctk.CTkLabel(self.forecast_container, text="PROJECTED 7-DAY SPEND", font=ctk.CTkFont(size=10, weight="bold"), text_color="gray70").pack(pady=(10, 2))
-        self.forecast_amount_label = ctk.CTkLabel(self.forecast_container, text="--", font=ctk.CTkFont(size=28, weight="bold"), text_color="#3B8ED0")
+        ctk.CTkLabel(self.forecast_container, text="PROJECTED 7-DAY SPEND", 
+                   font=ctk.CTkFont(family="Roboto", size=10, weight="bold"), text_color="gray70").pack(pady=(10, 2))
+        self.forecast_amount_label = ctk.CTkLabel(self.forecast_container, text="--", 
+                                                font=ctk.CTkFont(family="Roboto", size=28, weight="bold"), text_color="#3B8ED0")
         self.forecast_amount_label.pack(pady=(0, 2))
-        self.forecast_trend_label = ctk.CTkLabel(self.forecast_container, text="Run analysis...", font=ctk.CTkFont(size=12, weight="bold"))
+        self.forecast_trend_label = ctk.CTkLabel(self.forecast_container, text="Run analysis...", 
+                                               font=ctk.CTkFont(family="Roboto", size=12, weight="bold"))
         self.forecast_trend_label.pack(pady=(0, 10))
         
         # Metrics
-        ctk.CTkLabel(self.sidebar, text="Key Metrics", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=(15, 5), padx=20, anchor="w")
+        ctk.CTkLabel(self.sidebar, text="Key Metrics", 
+                   font=ctk.CTkFont(family="Roboto", size=14, weight="bold")).pack(pady=(15, 5), padx=20, anchor="w")
         
         self.stat_vars = {
             "Total": ctk.StringVar(value="--"),
@@ -172,8 +190,10 @@ class PredictionsView(ctk.CTkFrame):
         self.create_stat_row("Volatility", self.stat_vars["Std Dev"])
         
         # Insights
-        ctk.CTkLabel(self.sidebar, text="AI Insights", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=(20, 5), padx=20, anchor="w")
-        self.insights_text = ctk.CTkTextbox(self.sidebar, height=150, fg_color=("white", "gray20"), wrap="word", font=ctk.CTkFont(size=12))
+        ctk.CTkLabel(self.sidebar, text="AI Insights", 
+                   font=ctk.CTkFont(family="Roboto", size=14, weight="bold")).pack(pady=(20, 5), padx=20, anchor="w")
+        self.insights_text = ctk.CTkTextbox(self.sidebar, height=150, fg_color=("white", "#252525"), wrap="word", 
+                                          font=ctk.CTkFont(family="Roboto", size=12))
         self.insights_text.pack(fill="x", padx=15, pady=(0, 10))
         self.insights_text.insert("0.0", "No analysis data available.")
         self.insights_text.configure(state="disabled")
@@ -186,8 +206,8 @@ class PredictionsView(ctk.CTkFrame):
     def create_stat_row(self, title, variable):
         frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         frame.pack(fill="x", padx=20, pady=5)
-        ctk.CTkLabel(frame, text=title, text_color="gray70", font=ctk.CTkFont(size=12)).pack(side="left")
-        ctk.CTkLabel(frame, textvariable=variable, font=ctk.CTkFont(size=12, weight="bold")).pack(side="right")
+        ctk.CTkLabel(frame, text=title, text_color="gray70", font=ctk.CTkFont(family="Roboto", size=12)).pack(side="left")
+        ctk.CTkLabel(frame, textvariable=variable, font=ctk.CTkFont(family="Roboto", size=12, weight="bold")).pack(side="right")
 
     def open_settings(self):
         AnalysisSettingsModal(self.winfo_toplevel(), self.settings, self.handle_analysis_run)
@@ -301,10 +321,11 @@ class PredictionsView(ctk.CTkFrame):
         for widget in self.graph_frame.winfo_children():
             widget.destroy()
             
-        # Modern Dark Theme Colors
-        bg_color = '#1E1E1E' # Darker background
+        # Matches App Theme
+        bg_color = COLOR_BG_CARD 
         text_color = '#E0E0E0'
-        grid_color = '#333333'
+        grid_color = '#404040'
+        
         accent_blue = '#4CC9F0'
         accent_pink = '#F72585'
         accent_purple = '#7209B7'
@@ -425,13 +446,17 @@ class PredictionsView(ctk.CTkFrame):
         self.toolbar = NavigationToolbar2Tk(canvas, hidden_frame)
         self.toolbar.update()
         
-        self.btn_reset = ctk.CTkButton(controls_frame, text="⟲ Reset", width=80, height=30, fg_color="#2B2B2B", border_width=1, border_color="gray50", command=self.toolbar.home)
+        self.btn_reset = ctk.CTkButton(controls_frame, text="⟲ Reset", width=80, height=30, 
+                                     fg_color=COLOR_BG_CARD, border_width=1, border_color="gray50", command=self.toolbar.home)
         self.btn_reset.pack(side="left", padx=(0, 10))
-        self.btn_pan = ctk.CTkButton(controls_frame, text="✋ Pan", width=80, height=30, fg_color="#2B2B2B", border_width=1, border_color="gray50", command=self.toggle_pan)
+        self.btn_pan = ctk.CTkButton(controls_frame, text="✋ Pan", width=80, height=30, 
+                                   fg_color=COLOR_BG_CARD, border_width=1, border_color="gray50", command=self.toggle_pan)
         self.btn_pan.pack(side="left", padx=(0, 10))
-        self.btn_zoom = ctk.CTkButton(controls_frame, text="🔍 Zoom", width=80, height=30, fg_color="#2B2B2B", border_width=1, border_color="gray50", command=self.toggle_zoom)
+        self.btn_zoom = ctk.CTkButton(controls_frame, text="🔍 Zoom", width=80, height=30, 
+                                    fg_color=COLOR_BG_CARD, border_width=1, border_color="gray50", command=self.toggle_zoom)
         self.btn_zoom.pack(side="left", padx=(0, 10))
-        self.btn_save = ctk.CTkButton(controls_frame, text="💾 Save", width=80, height=30, fg_color="#2B2B2B", border_width=1, border_color="gray50", command=self.toolbar.save_figure)
+        self.btn_save = ctk.CTkButton(controls_frame, text="💾 Save", width=80, height=30, 
+                                    fg_color=COLOR_BG_CARD, border_width=1, border_color="gray50", command=self.toolbar.save_figure)
         self.btn_save.pack(side="right")
 
     def toggle_pan(self):
@@ -462,40 +487,3 @@ class PredictionsView(ctk.CTkFrame):
             except Exception as e:
                 messagebox.showerror("Error", str(e))
 
-    def toggle_pan(self):
-        self.toolbar.pan()
-        if self.btn_pan.cget("fg_color") == "#2B2B2B":
-            self.btn_pan.configure(fg_color="gray40", border_color="#3B8ED0")
-            self.btn_zoom.configure(fg_color="#2B2B2B", border_color="gray50") # Reset zoom
-        else:
-            self.btn_pan.configure(fg_color="#2B2B2B", border_color="gray50")
-
-    def toggle_zoom(self):
-        self.toolbar.zoom()
-        if self.btn_zoom.cget("fg_color") == "#2B2B2B":
-            self.btn_zoom.configure(fg_color="gray40", border_color="#3B8ED0")
-            self.btn_pan.configure(fg_color="#2B2B2B", border_color="gray50") # Reset pan
-        else:
-            self.btn_zoom.configure(fg_color="#2B2B2B", border_color="gray50")
-
-    def export_data(self):
-        if self.current_df is None:
-            messagebox.showwarning("No Data", "Please run the analysis first.")
-            return
-            
-        file_path = filedialog.asksaveasfilename(defaultextension=".csv",
-                                                 filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
-                                                 title="Export Prediction Data")
-        if file_path:
-            try:
-                self.current_df.to_csv(file_path, index=False)
-                messagebox.showinfo("Success", f"Data exported successfully to:\n{file_path}")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to export data:\n{e}")
-
-        self.label = ctk.CTkLabel(self, text="Financial Predictions", font=ctk.CTkFont(size=24, weight="bold"))
-        self.label.grid(row=0, column=0, padx=20, pady=20)
-        
-        # Example content
-        self.predict_btn = ctk.CTkButton(self, text="Run Model")
-        self.predict_btn.grid(row=1, column=0, padx=20, pady=10)

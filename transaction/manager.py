@@ -62,7 +62,7 @@ try:
 
             # Layout Configuration
             self.grid_columnconfigure(0, weight=1)
-            self.grid_rowconfigure(2, weight=1) # The list takes the most space
+            self.grid_rowconfigure(3, weight=1) # The list takes the most space
 
             # --- 1. Header Section ---
             self.header_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -76,37 +76,49 @@ try:
                                        text_color=self.COLOR_SECONDARY, font=ctk.CTkFont(size=12))
             self.subtitle.pack(side="left", padx=10, pady=(5,0))
 
-            # --- 2. Controls & Filter Bar ---
-            self.controls_frame = ctk.CTkFrame(self, fg_color="transparent")
-            self.controls_frame.grid(row=1, column=0, padx=20, pady=(0, 10), sticky="ew")
+            # --- 2. Live Summary Stats ---
+            self.stats_frame = ctk.CTkFrame(self, fg_color="transparent")
+            self.stats_frame.grid(row=1, column=0, padx=20, pady=(0, 15), sticky="ew")
+            self.stats_frame.grid_columnconfigure((0,1,2), weight=1) # Distribute evenly
+
+            self.card_total_count = self.create_stat_card(self.stats_frame, "Total Transactions", "0", "#3498db", 0)
+            self.card_total_income = self.create_stat_card(self.stats_frame, "Total Income", "₱0.00", "#27ae60", 1)
+            self.card_total_expense = self.create_stat_card(self.stats_frame, "Total Expenses", "₱0.00", "#c0392b", 2)
+
+            # --- 3. Controls & Filter Bar ---
+            self.controls_frame = ctk.CTkFrame(self, fg_color=self.COLOR_BG_CARD, corner_radius=10)
+            self.controls_frame.grid(row=2, column=0, padx=20, pady=(0, 10), sticky="ew")
             self.controls_frame.grid_columnconfigure(5, weight=1) # Spacer to push search/filter
 
             # Action Buttons
             self.btn_add = ctk.CTkButton(self.controls_frame, text="+ Add New", command=self._on_add, 
-                                       fg_color=self.COLOR_BTN_ADD, height=32, corner_radius=16)
-            self.btn_add.grid(row=0, column=0, padx=(0, 8))
+                                       fg_color=self.COLOR_BTN_ADD, height=32, corner_radius=16, font=ctk.CTkFont(weight="bold"))
+            self.btn_add.grid(row=0, column=0, padx=10, pady=10)
             
             self.btn_delete = ctk.CTkButton(self.controls_frame, text="Delete Selected", command=self._on_delete, 
-                                          fg_color=self.COLOR_BTN_DELETE, height=32, corner_radius=16)
-            self.btn_delete.grid(row=0, column=1, padx=(0, 8))
+                                          fg_color=self.COLOR_BTN_DELETE, height=32, corner_radius=16, font=ctk.CTkFont(weight="bold"))
+            self.btn_delete.grid(row=0, column=1, padx=(0, 10), pady=10)
 
             self.btn_refresh = ctk.CTkButton(self.controls_frame, text="Refresh", command=self._on_refresh, 
                                            fg_color=self.COLOR_BTN_REFRESH, height=32, corner_radius=16, width=80)
-            self.btn_refresh.grid(row=0, column=2, padx=(0, 8))
+            self.btn_refresh.grid(row=0, column=2, padx=(0, 10), pady=10)
             
             self.btn_select_all = ctk.CTkButton(self.controls_frame, text="Select All", command=self._on_select_all, 
                                               fg_color=self.COLOR_BTN_SELECT_ALL, height=32, corner_radius=16, width=90)
-            self.btn_select_all.grid(row=0, column=3, padx=(0, 8))
+            self.btn_select_all.grid(row=0, column=3, padx=(0, 10), pady=10)
             
-            # Filter
+            # Filter Label
+            ctk.CTkLabel(self.controls_frame, text="Filter Category:", font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=5, sticky="e", padx=(10, 5))
+
+            # Filter Combo
             self.var_filter = tk.StringVar(value="All Categories")
             self.combo_filter = ctk.CTkComboBox(self.controls_frame, values=["All Categories"], variable=self.var_filter,
                                               width=200, state="readonly", command=self._on_apply_filter)
-            self.combo_filter.grid(row=0, column=6, sticky="e")
+            self.combo_filter.grid(row=0, column=6, sticky="e", padx=10, pady=10)
 
-            # --- 3. Transaction List (Treeview) ---
+            # --- 4. Transaction List (Treeview) ---
             self.list_frame = ctk.CTkFrame(self, corner_radius=10, fg_color=self.COLOR_BG_CARD)
-            self.list_frame.grid(row=2, column=0, padx=20, pady=(0, 20), sticky="nsew")
+            self.list_frame.grid(row=3, column=0, padx=20, pady=(0, 20), sticky="nsew")
             self.list_frame.grid_rowconfigure(0, weight=1)
             self.list_frame.grid_columnconfigure(0, weight=1)
 
@@ -141,11 +153,11 @@ try:
             # Configure Columns
             cols = {
                 "id": ("ID", 50, "center"),
-                "date": ("Date", 100, "center"),
-                "type": ("Type", 80, "center"),
-                "category": ("Category", 150, "w"),
-                "amount": ("Amount", 120, "e"),
-                "description": ("Description", 300, "w")
+                "date": ("Date", 120, "center"),
+                "type": ("Type", 100, "center"),
+                "category": ("Category", 180, "w"),
+                "amount": ("Amount", 140, "e"),
+                "description": ("Description", 350, "w")
             }
             
             for col, (text, width, anchor) in cols.items():
@@ -163,6 +175,25 @@ try:
 
             # Load Data
             self.load_table_from_db()
+
+        def create_stat_card(self, parent, title, initial_value, accent_color, col_idx):
+            card = ctk.CTkFrame(parent, fg_color=self.COLOR_BG_CARD, corner_radius=15)
+            card.grid(row=0, column=col_idx, sticky="ew", padx=5)
+            
+            # Color Strip
+            strip = ctk.CTkFrame(card, height=80, width=6, fg_color=accent_color, corner_radius=6)
+            strip.pack(side="left", fill="y", padx=(0, 15))
+            
+            content = ctk.CTkFrame(card, fg_color="transparent")
+            content.pack(side="left", fill="both", expand=True, pady=10)
+            
+            lbl_title = ctk.CTkLabel(content, text=title, font=ctk.CTkFont(family="Roboto", size=12, weight="bold"), text_color="gray70")
+            lbl_title.pack(anchor="w")
+            
+            lbl_val = ctk.CTkLabel(content, text=initial_value, font=ctk.CTkFont(family="Roboto", size=22, weight="bold"), text_color="white")
+            lbl_val.pack(anchor="w", pady=(0, 0))
+            
+            return lbl_val
 
         def _on_tree_header_double_click(self, event):
             region = self.tree.identify_region(event.x, event.y)
@@ -192,6 +223,12 @@ try:
                 self.tree.delete(iid)
                 
             cats = set()
+            
+            # Summary counters
+            count = 0
+            total_inc = 0.0
+            total_exp = 0.0
+            
             for t in txs:
                 # Type logic
                 tx_type = "Income" if t.amount >= 0 else "Expense"
@@ -201,6 +238,11 @@ try:
                 if self._current_filter and self._current_filter != "All Categories":
                     if t.category != self._current_filter: continue
                 
+                # Stats calculation (based on filtered view)
+                count += 1
+                if t.amount >= 0: total_inc += t.amount
+                else: total_exp += abs(t.amount)
+
                 # Formatting
                 amt_str = f"₱{abs(t.amount):,.2f}"
                 if t.amount < 0:
@@ -210,11 +252,15 @@ try:
 
                 self.tree.insert("", "end", values=(t.id, t.date, tx_type, t.category, amt_str, t.description))
 
+            # Update Stats Cards
+            self.card_total_count.configure(text=str(count))
+            self.card_total_income.configure(text=f"₱{total_inc:,.2f}")
+            self.card_total_expense.configure(text=f"₱{total_exp:,.2f}")
+
             # Update combo
             values = ["All Categories"] + sorted(cats)
             self.combo_filter.configure(values=values)
             
-            # Restore selection if possible (omitted for simplicity) but ensure combo matches filter
             if self._current_filter not in values:
                  self.var_filter.set("All Categories")
                  self._current_filter = None
@@ -230,12 +276,10 @@ try:
                 self.tree.selection_remove(all_items)
 
         def _on_apply_filter(self, choice):
-            # Combined apply from combobox command
             self._current_filter = choice if choice != "All Categories" else None
             self.load_table_from_db()
             
         def _on_clear_filter(self):
-            # Deprecated button, handled by "All Categories" choice now
             self.var_filter.set("All Categories")
             self._current_filter = None
             self.load_table_from_db()
@@ -278,24 +322,21 @@ try:
         def _on_add(self):
             top = ctk.CTkToplevel(self)
             top.title("Add Transaction")
-            top.geometry("450x550")
+            top.geometry("480x600")
             top.resizable(False, False)
-            top.grab_set() # Modal
+            top.grab_set() 
             
-            # Styling for the modal
             content = ctk.CTkFrame(top, fg_color="transparent")
-            content.pack(fill="both", expand=True, padx=20, pady=20)
+            content.pack(fill="both", expand=True, padx=30, pady=30)
             
-            ctk.CTkLabel(content, text="New Transaction", font=ctk.CTkFont(size=20, weight="bold")).pack(pady=(0, 20))
+            ctk.CTkLabel(content, text="New Transaction", font=ctk.CTkFont(family="Roboto", size=22, weight="bold")).pack(pady=(0, 20))
 
-            # Form Helpers
             def create_field(label_text, widget_class, **kwargs):
                 ctk.CTkLabel(content, text=label_text, font=ctk.CTkFont(size=12, weight="bold"), text_color="gray").pack(anchor="w", pady=(5,0))
-                w = widget_class(content, **kwargs)
+                w = widget_class(content, height=35, **kwargs)
                 w.pack(fill="x", pady=(0, 10))
                 return w
 
-            # Fields
             # Date
             ent_date = create_field("Date (YYYY-MM-DD)", ctk.CTkEntry, placeholder_text="YYYY-MM-DD")
             ent_date.insert(0, datetime.date.today().isoformat())
@@ -308,7 +349,6 @@ try:
             var_cat = tk.StringVar(value="Salary")
             combo_cat = create_field("Category", ctk.CTkComboBox, values=self._income_categories, variable=var_cat)
             
-            # Logic for categories
             def _update_cats(choice):
                 if choice == "Income":
                     combo_cat.configure(values=self._income_categories)
@@ -328,7 +368,7 @@ try:
 
             # Actions
             btn_frame = ctk.CTkFrame(content, fg_color="transparent")
-            btn_frame.pack(fill="x")
+            btn_frame.pack(fill="x", pady=10)
             
             def _submit():
                 try:
@@ -352,8 +392,8 @@ try:
                 except Exception as e:
                     messagebox.showerror("Error", str(e))
 
-            ctk.CTkButton(btn_frame, text="Cancel", fg_color="transparent", border_width=1, command=top.destroy).pack(side="left", expand=True, padx=5)
-            ctk.CTkButton(btn_frame, text="Save Transaction", command=_submit, fg_color=self.COLOR_BTN_ADD).pack(side="right", expand=True, padx=5)
+            ctk.CTkButton(btn_frame, text="Cancel", fg_color="transparent", border_width=1, text_color="gray", command=top.destroy).pack(side="left", expand=True, padx=5, fill="x")
+            ctk.CTkButton(btn_frame, text="Save Transaction", command=_submit, fg_color=self.COLOR_BTN_ADD).pack(side="right", expand=True, padx=5, fill="x")
 except Exception:
     # Fallback placeholder so imports do not fail in environments without GUI libs.
     class TransactionView:
